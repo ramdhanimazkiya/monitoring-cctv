@@ -1,0 +1,752 @@
+// =============================================================================
+// CCTV Monitoring & Audio Paging System - Prisma schema (Tahap 1)
+//
+// Konvensi:
+//  - Tabel & kolom di database memakai snake_case (@@map / @map).
+//  - Waktu memakai timestamptz (UTC). Tampilan memakai timezone dari SystemSetting.
+//  - ID master data (user, site, zone, camera, audio_device, audio_group,
+//    audio_schedule) dibuat OTOMATIS oleh database ("CAM-0001", dst) dan TIDAK
+//    BISA diubah (trigger prevent_id_change). Lihat migration 0001 bagian 1 & 3.
+//  - ID tabel histori memakai BigInt autoincrement.
+//  - Constraint yang tidak dapat diekspresikan Prisma (CHECK, trigger, function,
+//    sequence) ada di prisma/migrations/0001_init/migration.sql.
+// =============================================================================
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../generated/prisma"
+  runtime                = "nodejs"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------------------------------------
+// ENUM
+// -----------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+
+  @@map("user_role")
+}
+
+/// Status perangkat. Hanya boleh diubah oleh monitoring service (bukan CRUD).
+/// UNKNOWN = belum pernah diperiksa.
+enum DeviceStatus {
+  UNKNOWN
+  ONLINE
+  OFFLINE
+  WARNING
+
+  @@map("device_status")
+}
+
+/// Ketersediaan stream, dipisahkan dari konektivitas perangkat.
+enum StreamStatus {
+  NOT_CONFIGURED
+  UNKNOWN
+  AVAILABLE
+  UNAVAILABLE
+
+  @@map("stream_status")
+}
+
+enum EventType {
+  DEVICE_STATUS_CHANGE
+  STREAM_UNAVAILABLE
+  VIDEO_LOSS
+  MOTION_DETECTED
+  TAMPERING
+  AUDIO_FAILURE
+  SCHEDULE_FAILURE
+  SYSTEM
+  OTHER
+
+  @@map("event_type")
+}
+
+enum EventSeverity {
+  INFO
+  WARNING
+  CRITICAL
+
+  @@map("event_severity")
+}
+
+enum EventStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+
+  @@map("event_status")
+}
+
+/// SIMULATION = tidak ada perangkat nyata yang disentuh. DEVICE = adapter perangkat sungguhan.
+enum ExecutionMode {
+  SIMULATION
+  DEVICE
+
+  @@map("execution_mode")
+}
+
+enum AudioCommandKind {
+  PTT
+  TTS
+
+  @@map("audio_command_kind")
+}
+
+enum AudioCommandSource {
+  MANUAL
+  SCHEDULE
+
+  @@map("audio_command_source")
+}
+
+/// SUCCESS hanya jika SEMUA target berstatus DELIVERED (ada konfirmasi tepercaya).
+/// UNCONFIRMED = terkirim tetapi perangkat tidak dapat mengonfirmasi pemutaran.
+enum AudioCommandStatus {
+  PENDING
+  ACTIVE
+  SUCCESS
+  PARTIAL
+  UNCONFIRMED
+  FAILED
+  CANCELLED
+  TIMEOUT
+
+  @@map("audio_command_status")
+}
+
+enum AudioTargetStatus {
+  PENDING
+  SENDING
+  DELIVERED
+  UNCONFIRMED
+  FAILED
+  CANCELLED
+  TIMEOUT
+
+  @@map("audio_target_status")
+}
+
+enum AudioTargetType {
+  DEVICE
+  ZONE
+  GROUP
+
+  @@map("audio_target_type")
+}
+
+enum ScheduleRecurrence {
+  ONCE
+  DAILY
+  WEEKLY
+  MONTHLY
+
+  @@map("schedule_recurrence")
+}
+
+/// Perilaku ketika jadwal terlewat (worker mati / server restart).
+enum MisfirePolicy {
+  SKIP
+  RUN_ONCE
+
+  @@map("misfire_policy")
+}
+
+enum ScheduleExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  PARTIAL
+  UNCONFIRMED
+  FAILED
+  SKIPPED
+  MISSED
+
+  @@map("schedule_execution_status")
+}
+
+enum AuditResult {
+  SUCCESS
+  FAILURE
+
+  @@map("audit_result")
+}
+
+// -----------------------------------------------------------------------------
+// IDENTITAS & AKSES
+// -----------------------------------------------------------------------------
+
+model User {
+  /// Otomatis: USR-0001. Immutable.
+  id                 String    @id @default(dbgenerated("next_user_id()")) @db.VarChar(20)
+  /// Disimpan lowercase (CHECK constraint). Tidak dapat dipakai ulang setelah user diarsipkan.
+  username           String    @unique @db.VarChar(50)
+  email              String?   @unique @db.VarChar(255)
+  fullName           String    @map("full_name") @db.VarChar(120)
+  passwordHash       String    @map("password_hash") @db.VarChar(255)
+  role               UserRole  @default(OPERATOR)
+  isActive           Boolean   @default(true) @map("is_active")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  failedLoginCount   Int       @default(0) @map("failed_login_count")
+  lockedUntil        DateTime? @map("locked_until") @db.Timestamptz(3)
+  lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  /// Soft delete: user yang pernah tercatat di audit/histori tidak boleh dihapus fisik.
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  sessions            Session[]
+  zoneAccess          UserZoneAccess[]
+  auditLogs           AuditLog[]
+  audioCommands       AudioCommand[]
+  ackedEvents         Event[]          @relation("EventAcknowledgedBy")
+  resolvedEvents      Event[]          @relation("EventResolvedBy")
+  createdSchedules    AudioSchedule[]  @relation("ScheduleCreatedBy")
+  updatedSchedules    AudioSchedule[]  @relation("ScheduleUpdatedBy")
+  channelLeases       AudioChannelLease[]
+  updatedSettings     SystemSetting[]
+
+  @@index([role, isActive])
+  @@map("users")
+}
+
+/// Session server-side. Cookie berisi token acak; yang disimpan hanya hash SHA-256.
+model Session {
+  id         BigInt    @id @default(autoincrement())
+  userId     String    @map("user_id") @db.VarChar(20)
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(64)
+  ipAddress  String?   @map("ip_address") @db.VarChar(45)
+  userAgent  String?   @map("user_agent") @db.VarChar(255)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// Hak akses Operator per zona (untuk PTT/TTS). Admin selalu memiliki akses ke semua zona.
+model UserZoneAccess {
+  userId    String   @map("user_id") @db.VarChar(20)
+  zoneId    String   @map("zone_id") @db.VarChar(20)
+  grantedAt DateTime @default(now()) @map("granted_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zone Zone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@id([userId, zoneId])
+  @@index([zoneId])
+  @@map("user_zone_access")
+}
+
+// -----------------------------------------------------------------------------
+// LOKASI
+// -----------------------------------------------------------------------------
+
+/// Lokasi / gedung / area besar.
+model Site {
+  /// Otomatis: SIT-0001. Immutable.
+  id          String    @id @default(dbgenerated("next_site_id()")) @db.VarChar(20)
+  name        String    @db.VarChar(120)
+  description String?   @db.Text
+  address     String?   @db.VarChar(255)
+  latitude    Decimal?  @db.Decimal(9, 6)
+  longitude   Decimal?  @db.Decimal(9, 6)
+  isActive    Boolean   @default(true) @map("is_active")
+  isDemo      Boolean   @default(false) @map("is_demo")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  zones        Zone[]
+  cameras      Camera[]
+  audioDevices AudioDevice[]
+  events       Event[]
+
+  @@index([isActive, deletedAt])
+  @@map("sites")
+}
+
+/// Area / zona di dalam sebuah Site. Dipakai sebagai target paging dan pengelompokan kamera.
+model Zone {
+  /// Otomatis: ZON-0001. Immutable.
+  id          String    @id @default(dbgenerated("next_zone_id()")) @db.VarChar(20)
+  siteId      String    @map("site_id") @db.VarChar(20)
+  name        String    @db.VarChar(120)
+  description String?   @db.Text
+  isActive    Boolean   @default(true) @map("is_active")
+  isDemo      Boolean   @default(false) @map("is_demo")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Restrict)
+
+  cameras         Camera[]
+  audioDevices    AudioDevice[]
+  userAccess      UserZoneAccess[]
+  events          Event[]
+  scheduleTargets AudioScheduleTarget[]
+
+  /// Dibutuhkan untuk composite FK (zone_id, site_id) pada Camera/AudioDevice:
+  /// menjamin zona perangkat selalu berada pada site yang sama dengan perangkat.
+  @@unique([id, siteId])
+  @@index([siteId])
+  @@map("zones")
+}
+
+// -----------------------------------------------------------------------------
+// PERANGKAT
+// -----------------------------------------------------------------------------
+
+model Camera {
+  /// Otomatis: CAM-0001. Immutable.
+  id          String   @id @default(dbgenerated("next_camera_id()")) @db.VarChar(20)
+  name        String   @db.VarChar(120)
+  siteId      String   @map("site_id") @db.VarChar(20)
+  zoneId      String?  @map("zone_id") @db.VarChar(20)
+  description String?  @db.Text
+  latitude    Decimal? @db.Decimal(9, 6)
+  longitude   Decimal? @db.Decimal(9, 6)
+  manufacturer String? @db.VarChar(80)
+  model       String?  @db.VarChar(80)
+
+  // --- Koneksi (tidak ada endpoint vendor yang diasumsikan) ---
+  host          String? @db.VarChar(255)
+  port          Int?
+  /// Kunci adapter integrasi, mis. "mock" atau "onvif". Default "mock" = SIMULASI.
+  adapterType   String  @default("mock") @map("adapter_type") @db.VarChar(30)
+  /// Konfigurasi adapter NON-rahasia.
+  adapterConfig Json?   @map("adapter_config")
+  /// Nama path/stream pada media gateway (mis. MediaMTX/go2rtc). Bukan URL RTSP berisi kredensial.
+  streamKey     String? @map("stream_key") @db.VarChar(120)
+  /// Kredensial terenkripsi (AES-256-GCM). TIDAK PERNAH dikembalikan oleh API.
+  credentialCipher String? @map("credential_cipher") @db.Text
+
+  isActive Boolean @default(true) @map("is_active")
+  isDemo   Boolean @default(false) @map("is_demo")
+
+  // --- Status: HANYA ditulis oleh monitoring service ---
+  status              DeviceStatus @default(UNKNOWN)
+  streamStatus        StreamStatus @default(NOT_CONFIGURED) @map("stream_status")
+  statusReason        String?      @map("status_reason") @db.VarChar(255)
+  statusChangedAt     DateTime?    @map("status_changed_at") @db.Timestamptz(3)
+  lastCheckedAt       DateTime?    @map("last_checked_at") @db.Timestamptz(3)
+  lastSeenAt          DateTime?    @map("last_seen_at") @db.Timestamptz(3)
+  consecutiveFailures Int          @default(0) @map("consecutive_failures")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  site Site  @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  zone Zone? @relation(fields: [zoneId, siteId], references: [id, siteId], onDelete: Restrict)
+
+  statusHistory DeviceStatusHistory[]
+  events        Event[]
+
+  @@index([siteId])
+  @@index([zoneId])
+  @@index([status])
+  @@index([isActive, deletedAt])
+  @@map("cameras")
+}
+
+model AudioDevice {
+  /// Otomatis: AUD-0001. Immutable.
+  id          String  @id @default(dbgenerated("next_audio_device_id()")) @db.VarChar(20)
+  name        String  @db.VarChar(120)
+  siteId      String  @map("site_id") @db.VarChar(20)
+  zoneId      String? @map("zone_id") @db.VarChar(20)
+  description String? @db.Text
+  latitude    Decimal? @db.Decimal(9, 6)
+  longitude   Decimal? @db.Decimal(9, 6)
+  manufacturer String? @db.VarChar(80)
+  model       String? @db.VarChar(80)
+
+  host          String? @db.VarChar(255)
+  port          Int?
+  /// Kunci adapter integrasi, mis. "mock". Default "mock" = SIMULASI.
+  adapterType   String  @default("mock") @map("adapter_type") @db.VarChar(30)
+  adapterConfig Json?   @map("adapter_config")
+  credentialCipher String? @map("credential_cipher") @db.Text
+
+  // --- Kapabilitas (jangan menyatakan audio terputar jika perangkat tidak bisa konfirmasi) ---
+  supportsPtt             Boolean @default(false) @map("supports_ptt")
+  supportsTts             Boolean @default(false) @map("supports_tts")
+  supportsDeliveryReceipt Boolean @default(false) @map("supports_delivery_receipt")
+
+  isActive Boolean @default(true) @map("is_active")
+  isDemo   Boolean @default(false) @map("is_demo")
+
+  // --- Status: HANYA ditulis oleh monitoring service ---
+  status              DeviceStatus @default(UNKNOWN)
+  statusReason        String?      @map("status_reason") @db.VarChar(255)
+  statusChangedAt     DateTime?    @map("status_changed_at") @db.Timestamptz(3)
+  lastCheckedAt       DateTime?    @map("last_checked_at") @db.Timestamptz(3)
+  lastSeenAt          DateTime?    @map("last_seen_at") @db.Timestamptz(3)
+  consecutiveFailures Int          @default(0) @map("consecutive_failures")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  site Site  @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  zone Zone? @relation(fields: [zoneId, siteId], references: [id, siteId], onDelete: Restrict)
+
+  statusHistory   DeviceStatusHistory[]
+  events          Event[]
+  groupMemberships AudioGroupMember[]
+  commandTargets  AudioCommandTarget[]
+  scheduleTargets AudioScheduleTarget[]
+  channelLease    AudioChannelLease?
+
+  @@index([siteId])
+  @@index([zoneId])
+  @@index([status])
+  @@index([isActive, deletedAt])
+  @@map("audio_devices")
+}
+
+/// Grup target paging buatan pengguna (lintas zona).
+model AudioGroup {
+  /// Otomatis: GRP-0001. Immutable.
+  id          String    @id @default(dbgenerated("next_audio_group_id()")) @db.VarChar(20)
+  name        String    @db.VarChar(120)
+  description String?   @db.Text
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  members         AudioGroupMember[]
+  scheduleTargets AudioScheduleTarget[]
+
+  @@map("audio_groups")
+}
+
+model AudioGroupMember {
+  groupId       String   @map("group_id") @db.VarChar(20)
+  audioDeviceId String   @map("audio_device_id") @db.VarChar(20)
+  addedAt       DateTime @default(now()) @map("added_at") @db.Timestamptz(3)
+
+  group  AudioGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  device AudioDevice @relation(fields: [audioDeviceId], references: [id], onDelete: Restrict)
+
+  @@id([groupId, audioDeviceId])
+  @@index([audioDeviceId])
+  @@map("audio_group_members")
+}
+
+// -----------------------------------------------------------------------------
+// MONITORING: HISTORI STATUS, EVENT & ALARM
+// -----------------------------------------------------------------------------
+
+/// APPEND-ONLY (trigger memblokir UPDATE/DELETE). Tepat satu dari camera_id / audio_device_id terisi.
+model DeviceStatusHistory {
+  id            BigInt       @id @default(autoincrement())
+  cameraId      String?      @map("camera_id") @db.VarChar(20)
+  audioDeviceId String?      @map("audio_device_id") @db.VarChar(20)
+  fromStatus    DeviceStatus? @map("from_status")
+  toStatus      DeviceStatus @map("to_status")
+  reason        String?      @db.VarChar(255)
+  latencyMs     Int?         @map("latency_ms")
+  detail        Json?
+  occurredAt    DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(3)
+
+  camera      Camera?      @relation(fields: [cameraId], references: [id], onDelete: Restrict)
+  audioDevice AudioDevice? @relation(fields: [audioDeviceId], references: [id], onDelete: Restrict)
+  event       Event?
+
+  @@index([cameraId, occurredAt(sort: Desc)])
+  @@index([audioDeviceId, occurredAt(sort: Desc)])
+  @@index([occurredAt])
+  @@map("device_status_history")
+}
+
+/// Event & alarm. Tidak ada DELETE dari aplikasi; hanya kolom siklus hidup alarm
+/// (status, acknowledged_*, resolved_*) yang boleh berubah. Maksimal satu perangkat per event.
+model Event {
+  id               BigInt        @id @default(autoincrement())
+  type             EventType
+  severity         EventSeverity @default(INFO)
+  status           EventStatus   @default(OPEN)
+  title            String        @db.VarChar(200)
+  message          String?       @db.Text
+  cameraId         String?       @map("camera_id") @db.VarChar(20)
+  audioDeviceId    String?       @map("audio_device_id") @db.VarChar(20)
+  siteId           String?       @map("site_id") @db.VarChar(20)
+  zoneId           String?       @map("zone_id") @db.VarChar(20)
+  /// Terisi jika event dihasilkan dari perubahan status perangkat.
+  statusHistoryId  BigInt?       @unique @map("status_history_id")
+  /// Kunci pengelompokan alarm berulang agar tidak banjir event.
+  dedupKey         String?       @map("dedup_key") @db.VarChar(120)
+  detail           Json?
+  occurredAt       DateTime      @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  acknowledgedById String?       @map("acknowledged_by_id") @db.VarChar(20)
+  acknowledgedAt   DateTime?     @map("acknowledged_at") @db.Timestamptz(3)
+  resolvedById     String?       @map("resolved_by_id") @db.VarChar(20)
+  resolvedAt       DateTime?     @map("resolved_at") @db.Timestamptz(3)
+  resolutionNote   String?       @map("resolution_note") @db.Text
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  camera         Camera?              @relation(fields: [cameraId], references: [id], onDelete: Restrict)
+  audioDevice    AudioDevice?         @relation(fields: [audioDeviceId], references: [id], onDelete: Restrict)
+  site           Site?                @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  zone           Zone?                @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  statusHistory  DeviceStatusHistory? @relation(fields: [statusHistoryId], references: [id], onDelete: Restrict)
+  acknowledgedBy User?                @relation("EventAcknowledgedBy", fields: [acknowledgedById], references: [id], onDelete: Restrict)
+  resolvedBy     User?                @relation("EventResolvedBy", fields: [resolvedById], references: [id], onDelete: Restrict)
+
+  @@index([occurredAt(sort: Desc)])
+  @@index([status, severity, occurredAt(sort: Desc)])
+  @@index([cameraId, occurredAt(sort: Desc)])
+  @@index([audioDeviceId, occurredAt(sort: Desc)])
+  @@index([siteId])
+  @@index([zoneId])
+  @@index([dedupKey])
+  @@map("events")
+}
+
+// -----------------------------------------------------------------------------
+// AUDIO PAGING: SCHEDULER
+// -----------------------------------------------------------------------------
+
+model AudioSchedule {
+  /// Otomatis: SCH-0001. Immutable.
+  id          String             @id @default(dbgenerated("next_audio_schedule_id()")) @db.VarChar(20)
+  name        String             @db.VarChar(120)
+  description String?            @db.Text
+
+  // --- Konten (Tahap awal: hanya TTS) ---
+  ttsText     String             @map("tts_text") @db.Text
+  ttsLanguage String             @default("id-ID") @map("tts_language") @db.VarChar(10)
+  ttsVoice    String?            @map("tts_voice") @db.VarChar(60)
+
+  // --- Waktu. Wall-clock lokal + IANA timezone; nextRunAt disimpan UTC. ---
+  timezone    String             @db.VarChar(64)
+  recurrence  ScheduleRecurrence
+  /// ONCE: saat eksekusi (UTC).
+  runAt       DateTime?          @map("run_at") @db.Timestamptz(3)
+  /// DAILY/WEEKLY/MONTHLY: jam lokal (pada `timezone`).
+  timeOfDay   DateTime?          @map("time_of_day") @db.Time(0)
+  startDate   DateTime?          @map("start_date") @db.Date
+  endDate     DateTime?          @map("end_date") @db.Date
+  /// WEEKLY: ISO 1=Senin .. 7=Minggu.
+  daysOfWeek  Int[]              @default([]) @map("days_of_week")
+  /// MONTHLY: 1..31. Bulan yang lebih pendek memakai hari terakhir bulan itu.
+  dayOfMonth  Int?               @map("day_of_month")
+
+  // --- Kebijakan eksekusi ---
+  misfirePolicy       MisfirePolicy @default(SKIP) @map("misfire_policy")
+  misfireGraceSeconds Int           @default(300) @map("misfire_grace_seconds")
+  maxRetries          Int           @default(2) @map("max_retries")
+  retryDelaySeconds   Int           @default(30) @map("retry_delay_seconds")
+
+  isActive    Boolean            @default(false) @map("is_active")
+  /// Dihitung ulang oleh scheduler (UTC). Null jika tidak ada eksekusi berikutnya.
+  nextRunAt   DateTime?          @map("next_run_at") @db.Timestamptz(3)
+  lastRunAt   DateTime?          @map("last_run_at") @db.Timestamptz(3)
+
+  createdById String             @map("created_by_id") @db.VarChar(20)
+  updatedById String?            @map("updated_by_id") @db.VarChar(20)
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?          @map("deleted_at") @db.Timestamptz(3)
+
+  createdBy User @relation("ScheduleCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy User? @relation("ScheduleUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  targets    AudioScheduleTarget[]
+  executions AudioScheduleExecution[]
+
+  /// Dipakai worker: "jadwal aktif yang sudah jatuh tempo".
+  @@index([isActive, nextRunAt])
+  @@map("audio_schedules")
+}
+
+/// Target jadwal: tepat satu dari device / zone / group, sesuai target_type (CHECK).
+model AudioScheduleTarget {
+  id         BigInt          @id @default(autoincrement())
+  scheduleId String          @map("schedule_id") @db.VarChar(20)
+  targetType AudioTargetType @map("target_type")
+  deviceId   String?         @map("device_id") @db.VarChar(20)
+  zoneId     String?         @map("zone_id") @db.VarChar(20)
+  groupId    String?         @map("group_id") @db.VarChar(20)
+
+  schedule AudioSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  device   AudioDevice?  @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  zone     Zone?         @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  group    AudioGroup?   @relation(fields: [groupId], references: [id], onDelete: Restrict)
+
+  @@unique([scheduleId, deviceId])
+  @@unique([scheduleId, zoneId])
+  @@unique([scheduleId, groupId])
+  @@index([deviceId])
+  @@index([zoneId])
+  @@index([groupId])
+  @@map("audio_schedule_targets")
+}
+
+/// Satu baris per kemunculan jadwal. UNIQUE (schedule_id, scheduled_for) = kunci idempotensi
+/// pencegah eksekusi ganda. Tidak ada DELETE dari aplikasi.
+model AudioScheduleExecution {
+  id           BigInt                  @id @default(autoincrement())
+  scheduleId   String                  @map("schedule_id") @db.VarChar(20)
+  /// Waktu nominal kemunculan jadwal (UTC), bukan waktu mulai aktual.
+  scheduledFor DateTime                @map("scheduled_for") @db.Timestamptz(3)
+  status       ScheduleExecutionStatus @default(PENDING)
+  attempt      Int                     @default(0)
+  workerId     String?                 @map("worker_id") @db.VarChar(80)
+  startedAt    DateTime?               @map("started_at") @db.Timestamptz(3)
+  finishedAt   DateTime?               @map("finished_at") @db.Timestamptz(3)
+  errorMessage String?                 @map("error_message") @db.Text
+  createdAt    DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  schedule AudioSchedule  @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
+  commands AudioCommand[]
+
+  @@unique([scheduleId, scheduledFor])
+  @@index([status, scheduledFor])
+  @@index([scheduleId, scheduledFor(sort: Desc)])
+  @@map("audio_schedule_executions")
+}
+
+// -----------------------------------------------------------------------------
+// AUDIO PAGING: PTT & TTS
+// -----------------------------------------------------------------------------
+
+/// Satu perintah paging (PTT atau TTS), manual maupun dari scheduler.
+/// Tidak ada DELETE dari aplikasi. `mode` membedakan simulasi dari perangkat nyata.
+model AudioCommand {
+  id                  BigInt             @id @default(autoincrement())
+  kind                AudioCommandKind
+  source              AudioCommandSource @default(MANUAL)
+  status              AudioCommandStatus @default(PENDING)
+  mode                ExecutionMode
+  userId              String?            @map("user_id") @db.VarChar(20)
+  scheduleExecutionId BigInt?            @map("schedule_execution_id")
+  /// Salinan teks saat dikirim (jadwal bisa berubah setelahnya).
+  ttsText             String?            @map("tts_text") @db.Text
+  ttsLanguage         String?            @map("tts_language") @db.VarChar(10)
+  /// Pilihan target asli, mis. {"devices":[..],"zones":[..],"groups":[..]}. Untuk jejak audit.
+  targetSpec          Json               @map("target_spec")
+  requestedAt         DateTime           @default(now()) @map("requested_at") @db.Timestamptz(3)
+  startedAt           DateTime?          @map("started_at") @db.Timestamptz(3)
+  endedAt             DateTime?          @map("ended_at") @db.Timestamptz(3)
+  errorCode           String?            @map("error_code") @db.VarChar(60)
+  errorMessage        String?            @map("error_message") @db.Text
+
+  user              User?                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  scheduleExecution AudioScheduleExecution? @relation(fields: [scheduleExecutionId], references: [id], onDelete: Restrict)
+
+  targets AudioCommandTarget[]
+  lease   AudioChannelLease?
+
+  @@index([requestedAt(sort: Desc)])
+  @@index([userId, requestedAt(sort: Desc)])
+  @@index([status])
+  @@index([scheduleExecutionId])
+  @@map("audio_commands")
+}
+
+/// Hasil per perangkat (hasil ekspansi zona/grup menjadi perangkat konkret saat dikirim).
+model AudioCommandTarget {
+  id               BigInt            @id @default(autoincrement())
+  commandId        BigInt            @map("command_id")
+  audioDeviceId    String            @map("audio_device_id") @db.VarChar(20)
+  status           AudioTargetStatus @default(PENDING)
+  /// true hanya jika perangkat/adapter memberi konfirmasi yang dapat dipercaya.
+  deliveryConfirmed Boolean          @default(false) @map("delivery_confirmed")
+  attempts         Int               @default(0)
+  startedAt        DateTime?         @map("started_at") @db.Timestamptz(3)
+  finishedAt       DateTime?         @map("finished_at") @db.Timestamptz(3)
+  errorCode        String?           @map("error_code") @db.VarChar(60)
+  errorMessage     String?           @map("error_message") @db.Text
+  detail           Json?
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  command AudioCommand @relation(fields: [commandId], references: [id], onDelete: Cascade)
+  device  AudioDevice  @relation(fields: [audioDeviceId], references: [id], onDelete: Restrict)
+
+  @@unique([commandId, audioDeviceId])
+  @@index([audioDeviceId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("audio_command_targets")
+}
+
+/// Lease kanal PTT. PRIMARY KEY = audio_device_id sehingga hanya satu sesi aktif per perangkat
+/// (mutual exclusion dijamin database). Lease kedaluwarsa dapat diambil alih oleh sesi baru.
+model AudioChannelLease {
+  audioDeviceId String   @id @map("audio_device_id") @db.VarChar(20)
+  commandId     BigInt   @unique @map("command_id")
+  userId        String   @map("user_id") @db.VarChar(20)
+  acquiredAt    DateTime @default(now()) @map("acquired_at") @db.Timestamptz(3)
+  heartbeatAt   DateTime @default(now()) @map("heartbeat_at") @db.Timestamptz(3)
+  expiresAt     DateTime @map("expires_at") @db.Timestamptz(3)
+
+  device  AudioDevice  @relation(fields: [audioDeviceId], references: [id], onDelete: Cascade)
+  command AudioCommand @relation(fields: [commandId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([expiresAt])
+  @@map("audio_channel_leases")
+}
+
+// -----------------------------------------------------------------------------
+// AUDIT & KONFIGURASI
+// -----------------------------------------------------------------------------
+
+/// APPEND-ONLY (trigger memblokir UPDATE/DELETE). Jangan pernah menyimpan password/secret
+/// pada kolom before/after; service wajib melakukan redaksi.
+model AuditLog {
+  id            BigInt      @id @default(autoincrement())
+  userId        String?     @map("user_id") @db.VarChar(20)
+  /// Salinan username saat kejadian (juga untuk percobaan login dengan user tidak dikenal).
+  actorUsername String?     @map("actor_username") @db.VarChar(50)
+  action        String      @db.VarChar(60)
+  entityType    String?     @map("entity_type") @db.VarChar(40)
+  entityId      String?     @map("entity_id") @db.VarChar(40)
+  result        AuditResult @default(SUCCESS)
+  message       String?     @db.VarChar(500)
+  before        Json?
+  after         Json?
+  ipAddress     String?     @map("ip_address") @db.VarChar(45)
+  userAgent     String?     @map("user_agent") @db.VarChar(255)
+  requestId     String?     @map("request_id") @db.VarChar(64)
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+/// Pengaturan sistem key-value. Key bersifat immutable.
+model SystemSetting {
+  key         String   @id @db.VarChar(80)
+  value       Json
+  description String?  @db.VarChar(255)
+  updatedById String?  @map("updated_by_id") @db.VarChar(20)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@map("system_settings")
+}

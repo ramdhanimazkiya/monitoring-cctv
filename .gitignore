@@ -1,0 +1,22 @@
+# Dependencies & build
+node_modules/
+dist/
+
+# Secrets & environment
+.env
+.env.*
+!.env.example
+
+# Prisma generated client (dibuat oleh `npm run db:generate`)
+backend/generated/
+
+# Logs & OS
+*.log
+logs/
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/

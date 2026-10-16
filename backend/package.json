@@ -1,0 +1,46 @@
+{
+  "name": "monitoring-cctv-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend CCTV Monitoring & Audio Paging System (Tahap 4: Device Monitoring Service)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test:foundation": "node scripts/test-foundation.js",
+    "test:monitoring": "node scripts/test-monitoring.js",
+    "test:streaming": "node scripts/test-streaming.js",
+    "test:paging": "node scripts/test-paging.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:seed": "node prisma/seed.js",
+    "db:verify": "node scripts/db-verify.js",
+    "db:reset": "prisma migrate reset"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "pg": "^8.16.3",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "pino-pretty": "^13.2.0",
+    "socket.io": "^4.8.4",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "prisma": "7.10.0",
+    "socket.io-client": "^4.8.4"
+  }
+}
