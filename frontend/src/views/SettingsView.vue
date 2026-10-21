@@ -27,7 +27,7 @@
       <Card title="Parameter Audio Paging" subtitle="Batas durasi kanal dan gateway transmisi">
         <div class="space-y-3">
           <Input label="PTT Channel Lease Timeout (detik)" v-model="settings.leaseSeconds" help="Batas maksimal bicara per sesi tanpa perpanjangan" />
-          <Input label="Gateway WHIP Endpoint URL" v-model="settings.whipUrl" help="Default: https://stream.zakuyu.fun/audio-raw/whip" />
+          <Input label="Gateway WHIP Endpoint URL" v-model="settings.whipUrl" placeholder="https://..." />
         </div>
       </Card>
 
@@ -53,7 +53,7 @@ const settings = reactive({
   timezone: 'Asia/Jakarta',
   checkInterval: '30',
   leaseSeconds: '60',
-  whipUrl: 'https://stream.zakuyu.fun/audio-raw/whip',
+  whipUrl: '',
   retentionStatus: '365',
   retentionEvents: '365',
   retentionAudit: '730'

@@ -31,6 +31,7 @@
     >
       <template #header>
         <div class="flex items-center gap-2">
+          <!-- Uji Ping Sumber Kamera CCTV -->
           <button
             type="button"
             :disabled="cctvPingLoading"
@@ -39,10 +40,10 @@
             @click="manualPingCctv"
           >
             <Radio :class="['w-3.5 h-3.5 text-blue-400', cctvPingLoading ? 'animate-spin' : 'animate-pulse']" />
-            <span>{{ cctvPingLoading ? 'Ping...' : `Auto-Ping: ${cctvAvgLatency}ms` }}</span>
+            <span>{{ cctvPingLoading ? 'Ping Kamera...' : `Auto-Ping: ${cctvAvgLatency}ms` }}</span>
           </button>
-          <span v-if="lastAutoPingTime !== '-'" class="text-slate-500 font-mono text-[10px] hidden sm:inline">
-            Update: {{ lastAutoPingTime }}
+          <span v-if="cctvStore.lastStatusCheckTime !== '-'" class="text-slate-500 font-mono text-[10px] hidden sm:inline">
+            Update: {{ cctvStore.lastStatusCheckTime }}
           </span>
         </div>
       </template>
@@ -50,7 +51,7 @@
       <template #id="{ row }">
         <div class="flex items-center gap-1.5 font-mono">
           <span class="font-bold text-blue-400">{{ row.id }}</span>
-          <span class="text-[10px] text-slate-500" title="ID dibuat otomatis oleh database (Immutable)">[AUTO]</span>
+          <span class="text-[10px] text-slate-500" title="ID dibuat otomatis oleh database (Immutable)"></span>
         </div>
       </template>
 
@@ -125,13 +126,27 @@
             'px-2 py-0.5 rounded text-[10px] font-mono font-bold inline-flex items-center gap-1.5',
             row.status === 'ONLINE'
               ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+              : row.status === 'OFFLINE'
+              ? 'bg-rose-950 text-rose-300 border border-rose-900'
               : row.status === 'WARNING'
               ? 'bg-amber-950 text-amber-300 border border-amber-800'
-              : 'bg-rose-950 text-rose-400 border border-rose-900'
+              : 'bg-slate-800 text-slate-400 border border-slate-700'
           ]"
+          :title="row.statusReason || (row.status === 'ONLINE' ? 'Sumber video CCTV aktif dan mengalirkan frame' : 'Sumber video CCTV mati / tidak aktif')"
         >
-          <span :class="['w-1.5 h-1.5 rounded-full', row.status === 'ONLINE' ? 'bg-emerald-400' : row.status === 'WARNING' ? 'bg-amber-400' : 'bg-rose-400']"></span>
-          {{ row.status || 'ONLINE' }}
+          <span
+            :class="[
+              'w-1.5 h-1.5 rounded-full',
+              row.status === 'ONLINE'
+                ? 'bg-emerald-400'
+                : row.status === 'OFFLINE'
+                ? 'bg-rose-400'
+                : row.status === 'WARNING'
+                ? 'bg-amber-400'
+                : 'bg-slate-400'
+            ]"
+          ></span>
+          {{ row.status || 'UNKNOWN' }}
         </span>
       </template>
 
@@ -215,7 +230,7 @@
       <template #id="{ row }">
         <div class="flex items-center gap-1.5 font-mono">
           <span class="font-bold text-purple-400">{{ row.id }}</span>
-          <span class="text-[10px] text-slate-500" title="ID dibuat otomatis oleh database (Immutable)">[AUTO]</span>
+          <span class="text-[10px] text-slate-500" title="ID dibuat otomatis oleh database (Immutable)"></span>
         </div>
       </template>
 
@@ -271,11 +286,24 @@
               ? 'bg-rose-950 text-rose-300 border border-rose-800 animate-pulse'
               : row.status === 'ONLINE'
               ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-              : 'bg-rose-950 text-rose-400 border border-rose-900'
+              : row.status === 'OFFLINE'
+              ? 'bg-rose-950 text-rose-300 border border-rose-900'
+              : 'bg-slate-800 text-slate-400 border border-slate-700'
           ]"
         >
-          <span :class="['w-1.5 h-1.5 rounded-full', row.status === 'ON AIR' ? 'bg-rose-400 animate-ping' : row.status === 'ONLINE' ? 'bg-emerald-400' : 'bg-rose-400']"></span>
-          {{ row.status }}
+          <span
+            :class="[
+              'w-1.5 h-1.5 rounded-full',
+              row.status === 'ON AIR'
+                ? 'bg-rose-400 animate-ping'
+                : row.status === 'ONLINE'
+                ? 'bg-emerald-400'
+                : row.status === 'OFFLINE'
+                ? 'bg-rose-400'
+                : 'bg-slate-400'
+            ]"
+          ></span>
+          {{ row.status || 'UNKNOWN' }}
         </span>
       </template>
 
@@ -334,22 +362,23 @@
     <Modal
       v-model="cctvModalOpen"
       :title="modalMode === 'create' ? 'Tambah Kamera CCTV' : `Edit Kamera: ${activeCctv.id}`"
-      description="ID kamera CCTV dibuat otomatis oleh sistem (CAM-xxxx) dan terkunci. Format stream mendukung HTTPS/HLS/RTSP."
+      description="ID kamera CCTV dibuat otomatis oleh sistem (CAM-xxxx) dan terkunci."
       size="lg"
     >
       <div class="space-y-4">
         <div class="p-2.5 rounded bg-[#151d2e] border border-[#283548] text-xs font-mono flex items-center justify-between">
           <span class="text-slate-400">ID Kamera (Terkunci & Immutable): </span>
           <strong class="text-blue-400 font-bold">
-            {{ modalMode === 'create' ? '[AUTO GENERATE (e.g. CAM-0004)]' : activeCctv.id }}
+            {{ modalMode === 'create' ? '[AUTO GENERATE]' : activeCctv.id }}
           </strong>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input v-model="activeCctv.name" label="Nama Kamera" placeholder="Contoh: Kamera Rest Room Bandung" required />
+          <Input v-model="activeCctv.name" label="Nama Kamera" placeholder="Kamera Lobby Utama" required />
           <Select
             v-model="activeCctv.siteId"
             label="Lokasi Site"
+            :placeholder="cctvStore.sites.length ? '-- Pilih Lokasi Site --' : '-- Belum Ada Site Terdaftar --'"
             :options="siteOptions"
             required
           />
@@ -359,9 +388,10 @@
           <Select
             v-model="activeCctv.zoneId"
             label="Zona Lokasi"
+            :placeholder="cctvStore.zones.length ? '-- Pilih Zona Lokasi --' : '-- Belum Ada Zona Terdaftar --'"
             :options="zoneOptions"
           />
-          <Input v-model="activeCctv.description" label="Deskripsi / Area" placeholder="Rest room lantai 1 gedung timur" />
+          <Input v-model="activeCctv.description" label="Deskripsi / Area" placeholder="Menghadap pintu masuk utama" />
         </div>
 
         <!-- Stream URL Input -->
@@ -374,7 +404,7 @@
             <input
               v-model="activeCctv.streamUrl"
               type="text"
-              placeholder="https://... atau rtsp://..."
+              placeholder="https://stream.example.com/ atau rtsp://..."
               class="flex-1 bg-[#111827] border border-[#283548] rounded-md px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
               required
             />
@@ -393,14 +423,7 @@
         <!-- GPS Coordinates for Leaflet Map -->
         <div class="p-3 rounded-lg bg-[#111827] border border-[#283548] space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-slate-300 font-mono">Koordinat GPS Peta (Leaflet OSM):</span>
-            <button
-              type="button"
-              class="text-[10px] font-mono text-cyan-400 hover:underline cursor-pointer"
-              @click="setBandungCoords"
-            >
-              Set Titik Bandung (-6.917464, 107.619122)
-            </button>
+            <span class="text-xs font-medium text-slate-300 font-mono">Koordinat GPS Peta:</span>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -410,8 +433,8 @@
                 v-model.number="activeCctv.latitude"
                 type="number"
                 step="0.000001"
-                placeholder="-6.917464"
-                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Contoh: -6.917464"
+                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
             <div>
@@ -420,8 +443,8 @@
                 v-model.number="activeCctv.longitude"
                 type="number"
                 step="0.000001"
-                placeholder="107.619122"
-                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Contoh: 107.619122"
+                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -447,14 +470,14 @@
         <div class="p-2.5 rounded bg-[#151d2e] border border-[#283548] text-xs font-mono flex items-center justify-between">
           <span class="text-slate-400">ID Speaker (Terkunci & Immutable): </span>
           <strong class="text-purple-400 font-bold">
-            {{ modalMode === 'create' ? '[AUTO GENERATE (e.g. AUD-0004)]' : activeSpeaker.id }}
+            {{ modalMode === 'create' ? '[AUTO GENERATE]' : activeSpeaker.id }}
           </strong>
         </div>
 
         <Input
           v-model="activeSpeaker.name"
           label="Nama Speaker Audio"
-          placeholder="Contoh: Speaker Koridor Utara"
+          placeholder="Speaker Koridor Timur, Horn Parkir"
           required
         />
 
@@ -462,11 +485,13 @@
           <Select
             v-model="activeSpeaker.siteId"
             label="Lokasi Site"
+            :placeholder="cctvStore.sites.length ? '-- Pilih Lokasi Site --' : '-- Belum Ada Site Terdaftar --'"
             :options="siteOptions"
           />
           <Select
             v-model="activeSpeaker.zoneId"
             label="Zona Paging"
+            :placeholder="cctvStore.zones.length ? '-- Pilih Zona Paging --' : '-- Belum Ada Zona Terdaftar --'"
             :options="zoneOptions"
           />
         </div>
@@ -477,7 +502,7 @@
             <input
               v-model="activeSpeaker.whipUrl"
               type="text"
-              placeholder="https://stream.zakuyu.fun/audio-raw/whip"
+              placeholder="https://stream.example.com/audio-raw/whip"
               class="flex-1 bg-[#111827] border border-[#283548] rounded-md px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               required
             />
@@ -510,14 +535,7 @@
         <!-- GPS Coordinates for Leaflet Map -->
         <div class="p-3 bg-[#0d121d] border border-[#283548] rounded-lg space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-slate-300 font-mono">Koordinat GPS Peta (Leaflet OSM):</span>
-            <button
-              type="button"
-              class="text-[10px] font-mono text-cyan-400 hover:underline cursor-pointer"
-              @click="setSpeakerBandungCoords"
-            >
-              Set Titik Bandung (-6.917464, 107.619122)
-            </button>
+            <span class="text-xs font-medium text-slate-300 font-mono">Koordinat GPS Peta:</span>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -527,8 +545,8 @@
                 v-model.number="activeSpeaker.latitude"
                 type="number"
                 step="0.000001"
-                placeholder="-6.917464"
-                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Contoh: -6.917464"
+                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
             <div>
@@ -537,8 +555,8 @@
                 v-model.number="activeSpeaker.longitude"
                 type="number"
                 step="0.000001"
-                placeholder="107.619122"
-                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="Contoh: 107.619122"
+                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -658,20 +676,15 @@ async function manualPingCctv() {
   if (cctvPingLoading.value) return
   cctvPingLoading.value = true
   try {
-    const pings = cctvStore.cameras.map((c) => cctvStore.pingCamera(c.id))
-    await Promise.allSettled(pings)
-    lastAutoPingTime.value = new Date().toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
+    await cctvStore.checkCameraStatus()
+    lastAutoPingTime.value = cctvStore.lastStatusCheckTime
     const onlineCount = cctvStore.cameras.filter((c) => c.status === 'ONLINE').length
     toast.success(
       'Ping Kamera Selesai',
-      `${onlineCount}/${cctvStore.cameras.length} kamera responsif (${cctvAvgLatency.value} ms)`
+      `${onlineCount}/${cctvStore.cameras.length} kamera aktif (${cctvAvgLatency.value} ms)`
     )
   } catch (err) {
-    toast.error('Ping Gagal', err.message || 'Koneksi kamera gagal')
+    toast.error('Ping Gagal', err.message || 'Pemeriksaan kamera gagal')
   } finally {
     cctvPingLoading.value = false
   }
@@ -703,14 +716,14 @@ async function manualPingAudio() {
 const activeSpeaker = reactive({
   id: '',
   name: '',
-  siteId: 'SIT-0001',
-  zoneId: 'ZON-0001',
-  whipUrl: 'https://stream.zakuyu.fun/audio-raw/whip',
-  latitude: -6.917464,
-  longitude: 107.619122,
+  siteId: '',
+  zoneId: '',
+  whipUrl: '',
+  latitude: null,
+  longitude: null,
   sampleRate: 16000,
   channels: 1,
-  volume: 85
+  volume: 80
 })
 
 const activeCctv = reactive({
@@ -725,9 +738,6 @@ const activeCctv = reactive({
 })
 
 const siteOptions = computed(() => {
-  if (!cctvStore.sites.length) {
-    return [{ value: 'SIT-0001', label: 'SIT-0001 - Site A' }]
-  }
   return cctvStore.sites.map((s) => ({
     value: s.id,
     label: `${s.id} - ${s.name}`
@@ -735,12 +745,6 @@ const siteOptions = computed(() => {
 })
 
 const zoneOptions = computed(() => {
-  if (!cctvStore.zones.length) {
-    return [
-      { value: 'ZON-0001', label: 'ZON-0001 - Lobby Utama' },
-      { value: 'ZON-0002', label: 'ZON-0002 - Area Parkir' }
-    ]
-  }
   return cctvStore.zones.map((z) => ({
     value: z.id,
     label: `${z.id} - ${z.name}`
@@ -748,49 +752,39 @@ const zoneOptions = computed(() => {
 })
 
 const cctvColumns = [
-  { key: 'id', label: 'ID Kamera (Auto)', width: 'w-32' },
+  { key: 'id', label: 'ID Kamera', width: 'w-32' },
   { key: 'name', label: 'Nama Kamera' },
   { key: 'zone', label: 'Zona & Site' },
   { key: 'streamUrl', label: 'URL Stream Video' },
   { key: 'coordinates', label: 'Koordinat GPS', width: 'w-36' },
-  { key: 'latency', label: 'Latensi (Auto)', width: 'w-28' },
-  { key: 'status', label: 'Status Monitor', width: 'w-28' },
+  { key: 'latency', label: 'Latensi Ping', width: 'w-28' },
+  { key: 'status', label: 'Status Kamera', width: 'w-28' },
   { key: 'actions', label: 'Aksi', align: 'right', width: 'w-28' }
 ]
 
 const audioColumns = [
-  { key: 'id', label: 'ID (Auto)', width: 'w-32' },
+  { key: 'id', label: 'ID Speaker', width: 'w-32' },
   { key: 'name', label: 'Nama Speaker' },
   { key: 'zoneName', label: 'Zona Lokasi' },
   { key: 'whipUrl', label: 'WHIP Ingestion URL' },
   { key: 'coordinates', label: 'Koordinat GPS', width: 'w-36' },
   { key: 'format', label: 'Format Audio', width: 'w-28' },
-  { key: 'latency', label: 'Latensi (Auto)', width: 'w-28' },
+  { key: 'latency', label: 'Latensi', width: 'w-28' },
   { key: 'status', label: 'Status Dinamis', width: 'w-28' },
   { key: 'actions', label: 'Aksi', align: 'right', width: 'w-28' }
 ]
-
-function setBandungCoords() {
-  activeCctv.latitude = -6.917464
-  activeCctv.longitude = 107.619122
-}
-
-function setSpeakerBandungCoords() {
-  activeSpeaker.latitude = -6.917464
-  activeSpeaker.longitude = 107.619122
-}
 
 function openCreateModal(type) {
   modalMode.value = 'create'
   if (type === 'AUDIO') {
     activeSpeaker.id = ''
     activeSpeaker.name = ''
-    activeSpeaker.siteId = cctvStore.sites[0]?.id || 'SIT-0001'
-    activeSpeaker.zoneId = cctvStore.zones[0]?.id || 'ZON-0001'
-    activeSpeaker.whipUrl = 'https://stream.zakuyu.fun/audio-raw/whip'
-    activeSpeaker.latitude = -6.917464
-    activeSpeaker.longitude = 107.619122
-    activeSpeaker.volume = 85
+    activeSpeaker.siteId = cctvStore.sites[0]?.id || ''
+    activeSpeaker.zoneId = cctvStore.zones[0]?.id || ''
+    activeSpeaker.whipUrl = ''
+    activeSpeaker.latitude = null
+    activeSpeaker.longitude = null
+    activeSpeaker.volume = 80
     speakerModalOpen.value = true
   } else {
     activeCctv.id = ''
@@ -809,8 +803,8 @@ function handleEditCctv(row) {
   modalMode.value = 'edit'
   activeCctv.id = row.id
   activeCctv.name = row.name
-  activeCctv.siteId = row.siteId || 'SIT-0001'
-  activeCctv.zoneId = row.zoneId || 'ZON-0001'
+  activeCctv.siteId = row.siteId || ''
+  activeCctv.zoneId = row.zoneId || ''
   activeCctv.streamUrl = row.streamUrl || ''
   activeCctv.latitude = row.latitude ? Number(row.latitude) : null
   activeCctv.longitude = row.longitude ? Number(row.longitude) : null
@@ -827,9 +821,9 @@ function handleDeleteCctv(row) {
 async function pingCctv(row) {
   const result = await cctvStore.pingCamera(row.id)
   if (result.success) {
-    toast.success('Kamera Online', `${row.id} online dengan latensi ${result.latency} ms`)
+    toast.success('Stream CCTV Aktif', `Sumber video ${row.id} aktif (${result.latency || 0} ms)`)
   } else {
-    toast.error('Ping Gagal', `Kamera ${row.id} tidak merespons: ${result.error}`)
+    toast.error('Stream CCTV Terputus', `Sumber video ${row.id} tidak aktif: ${result.reason || result.error}`)
   }
 }
 
@@ -993,9 +987,11 @@ onMounted(async () => {
     cctvStore.fetchCameras(),
     cctvStore.fetchSitesAndZones()
   ])
-  // Auto-ping pertama kali setelah data termuat
+  // Polling status kamera 1 detik via MediaMTX API
+  cctvStore.startCameraStatusPolling(1000)
+  // Auto-ping pertama kali setelah data termuat untuk audio
   runAutoPing()
-  // Jalankan auto-ping otomatis setiap 10 detik
+  // Jalankan auto-ping audio periodik
   autoPingTimer = setInterval(runAutoPing, 10000)
 })
 
@@ -1004,5 +1000,6 @@ onUnmounted(() => {
     clearInterval(autoPingTimer)
     autoPingTimer = null
   }
+  cctvStore.stopCameraStatusPolling()
 })
 </script>

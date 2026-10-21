@@ -92,89 +92,148 @@ export async function checkCameraStream(cameraOrId) {
 
   if (!camera) return null;
 
+  const fromStatus = camera.status;
   const fromStreamStatus = camera.streamStatus;
   const checkResult = await gatewayAdapter.checkStreamAvailability(camera);
-  const toStreamStatus = checkResult.status;
+  let toStreamStatus = checkResult.status;
+  if (camera.status === "OFFLINE") {
+    toStreamStatus = "UNAVAILABLE";
+  }
+
+  // IMPORTANT: Status ONLINE/OFFLINE setiap kamera mencerminkan apakah sumber video
+  // CCTV masih aktif, BUKAN apakah server MediaMTX dapat di-ping.
+  let toStatus = fromStatus;
+  if (camera.adapterConfig?.simulateVideoLoss === true) {
+    toStatus = "WARNING";
+    toStreamStatus = "UNAVAILABLE";
+  } else if (toStreamStatus === "AVAILABLE") {
+    toStatus = "ONLINE";
+  } else if (toStreamStatus === "UNAVAILABLE") {
+    toStatus = "OFFLINE";
+  } else if (toStreamStatus === "NOT_CONFIGURED") {
+    toStatus = "UNKNOWN";
+  }
 
   const now = new Date();
+  const hasStatusChanged = fromStatus !== toStatus;
   const hasStreamChanged = fromStreamStatus !== toStreamStatus;
+  const statusReason = checkResult.reason;
 
-  // Aturan Agregasi: Jika hardware ONLINE tetapi stream UNAVAILABLE, tandai WARNING
-  if (camera.status === "ONLINE" && toStreamStatus === "UNAVAILABLE" && camera.streamKey) {
-    await prisma.camera.update({
-      where: { id: camera.id },
-      data: {
-        status: "WARNING",
-        statusReason: "Kamera terhubung, namun video stream tidak tersedia (Stream Unavailable)",
-        statusChangedAt: now,
-      },
-    });
+  // Selalu update record kamera dengan status aktual sumber video
+  await prisma.camera.update({
+    where: { id: camera.id },
+    data: {
+      status: toStatus,
+      streamStatus: toStreamStatus,
+      statusReason,
+      lastCheckedAt: now,
+      ...(toStatus === "ONLINE" && { lastSeenAt: now }),
+      ...(hasStatusChanged && { statusChangedAt: now }),
+    },
+  });
 
+  // Jika status kamera berubah (ONLINE <-> OFFLINE <-> UNKNOWN)
+  if (hasStatusChanged) {
+    logger.info(
+      `[Kamera ${camera.id}] Perubahan status: ${fromStatus} -> ${toStatus} (${statusReason})`,
+    );
+
+    // 1. Catat ke device_status_history
+    try {
+      await prisma.deviceStatusHistory.create({
+        data: {
+          cameraId: camera.id,
+          fromStatus,
+          toStatus,
+          reason: statusReason,
+          latencyMs: checkResult.latencyMs || null,
+          detail: checkResult.telemetry || null,
+          occurredAt: now,
+        },
+      });
+    } catch (err) {
+      logger.warn({ err }, "Gagal mencatat device_status_history");
+    }
+
+    // 2. Broadcast via WebSocket Hub
     wsHub.broadcastDeviceStatus({
       deviceId: camera.id,
       deviceType: "CAMERA",
-      status: "WARNING",
-      previousStatus: "ONLINE",
+      status: toStatus,
+      previousStatus: fromStatus,
       timestamp: now,
     });
+
+    // 3. Jika kamera berubah menjadi OFFLINE (kamera dimatikan / stream putus), buat Alarm Insiden OFFLINE
+    if (toStatus === "OFFLINE") {
+      try {
+        const event = await prisma.event.create({
+          data: {
+            type: "DEVICE_STATUS_CHANGE",
+            severity: "CRITICAL",
+            status: "OPEN",
+            title: `[${camera.id}] ${camera.name} OFFLINE (Sumber Video CCTV Mati)`,
+            message: statusReason || "Sumber video CCTV tidak aktif / kamera mati",
+            cameraId: camera.id,
+            siteId: camera.siteId,
+            zoneId: camera.zoneId,
+            dedupKey: `camera:${camera.id}:offline`,
+            occurredAt: now,
+          },
+        });
+
+        wsHub.broadcastEventAlarm({
+          id: String(event.id),
+          type: event.type,
+          severity: event.severity,
+          status: event.status,
+          title: event.title,
+          message: event.message,
+          deviceId: camera.id,
+          timestamp: now,
+        });
+      } catch (err) {
+        logger.warn({ err }, "Gagal membuat alarm OFFLINE kamera");
+      }
+    }
+
+    // 4. Jika pulih kembali ONLINE, otomatis selesaikan (RESOLVED) alarm
+    if (toStatus === "ONLINE" && fromStatus === "OFFLINE") {
+      try {
+        await prisma.event.updateMany({
+          where: {
+            status: { in: ["OPEN", "ACKNOWLEDGED"] },
+            cameraId: camera.id,
+          },
+          data: {
+            status: "RESOLVED",
+            resolvedAt: now,
+            resolutionNote: "Sumber video CCTV pulih kembali ONLINE (Stream aktif)",
+          },
+        });
+      } catch (err) {
+        logger.warn({ err }, "Gagal menyelesaikan alarm pulih kamera");
+      }
+    }
   }
 
-  // Jika status stream berubah
+  // Jika status stream berubah, broadcast stream status
   if (hasStreamChanged) {
-    logger.info(
-      `[Stream ${camera.id}] Status stream berubah: ${fromStreamStatus} -> ${toStreamStatus} (${checkResult.reason})`,
-    );
-
-    await prisma.camera.update({
-      where: { id: camera.id },
-      data: {
-        streamStatus: toStreamStatus,
-      },
-    });
-
-    // Broadcast perubahan stream status via WebSocket
     wsHub.broadcastStreamStatus({
       cameraId: camera.id,
       streamStatus: toStreamStatus,
       streamKey: camera.streamKey,
       timestamp: now,
     });
-
-    // Jika stream terputus dari AVAILABLE -> UNAVAILABLE, buat event alarm
-    if (fromStreamStatus === "AVAILABLE" && toStreamStatus === "UNAVAILABLE") {
-      const event = await prisma.event.create({
-        data: {
-          type: "STREAM_UNAVAILABLE",
-          severity: "WARNING",
-          status: "OPEN",
-          title: `[${camera.id}] Video Stream Terputus`,
-          message: checkResult.reason,
-          cameraId: camera.id,
-          siteId: camera.siteId,
-          zoneId: camera.zoneId,
-          dedupKey: `camera:${camera.id}:stream`,
-          occurredAt: now,
-        },
-      });
-
-      wsHub.broadcastEventAlarm({
-        id: String(event.id),
-        type: event.type,
-        severity: event.severity,
-        status: event.status,
-        title: event.title,
-        message: event.message,
-        deviceId: camera.id,
-        timestamp: now,
-      });
-    }
   }
 
   return {
     cameraId: camera.id,
-    fromStreamStatus,
+    status: toStatus,
+    streamStatus: toStreamStatus,
     toStreamStatus,
-    reason: checkResult.reason,
+    reason: statusReason,
+    latencyMs: checkResult.latencyMs || 0,
     telemetry: checkResult.telemetry || null,
   };
 }
@@ -198,9 +257,136 @@ export async function getGatewayStatus() {
   return gatewayAdapter.getGatewayHealth();
 }
 
+export async function getGatewayPaths() {
+  return gatewayAdapter.getPathsList();
+}
+
+export async function getGatewayPath(pathName) {
+  return gatewayAdapter.getPath(pathName);
+}
+
 export async function negotiateWhep(streamKey, sdpOffer) {
   if (!streamKey) {
     throw new BadRequestError("Stream key wajib diisi");
   }
   return gatewayAdapter.negotiateWhep(streamKey, sdpOffer);
+}
+
+/**
+ * Sinkronisasi status stream dari klien video player (WebRTC / HLS).
+ * Ketika player di frontend memutar video -> ONLINE.
+ * Ketika player di frontend mengalami error / stream putus -> OFFLINE.
+ */
+export async function syncStreamStatus(cameraId, payload = {}) {
+  const camera = await prisma.camera.findFirst({
+    where: { id: cameraId, deletedAt: null },
+  });
+  if (!camera) return null;
+
+  const toStatus = payload.status === "ONLINE" ? "ONLINE" : payload.status === "UNKNOWN" ? "UNKNOWN" : "OFFLINE";
+  const toStreamStatus = toStatus === "ONLINE" ? "AVAILABLE" : toStatus === "UNKNOWN" ? "NOT_CONFIGURED" : "UNAVAILABLE";
+  const statusReason =
+    payload.reason ||
+    (toStatus === "ONLINE"
+      ? "Sumber video CCTV aktif dan mengalirkan frame video"
+      : "Sumber video CCTV mati / kamera tidak mengirim sinyal video");
+
+  const fromStatus = camera.status;
+  const hasStatusChanged = fromStatus !== toStatus;
+  const now = new Date();
+
+  await prisma.camera.update({
+    where: { id: camera.id },
+    data: {
+      status: toStatus,
+      streamStatus: toStreamStatus,
+      statusReason,
+      lastCheckedAt: now,
+      ...(toStatus === "ONLINE" && { lastSeenAt: now, consecutiveFailures: 0 }),
+      ...(toStatus === "OFFLINE" && { consecutiveFailures: camera.consecutiveFailures + 1 }),
+      ...(hasStatusChanged && { statusChangedAt: now }),
+    },
+  });
+
+  if (hasStatusChanged) {
+    logger.info(`[Kamera ${camera.id}] Status diperbarui: ${fromStatus} -> ${toStatus} (${statusReason})`);
+
+    try {
+      await prisma.deviceStatusHistory.create({
+        data: {
+          cameraId: camera.id,
+          fromStatus,
+          toStatus,
+          reason: statusReason,
+          latencyMs: payload.latencyMs || (toStatus === "ONLINE" ? 18 : null),
+          occurredAt: now,
+        },
+      });
+    } catch (err) {
+      logger.warn({ err }, "Gagal mencatat status history");
+    }
+
+    wsHub.broadcastDeviceStatus({
+      deviceId: camera.id,
+      deviceType: "CAMERA",
+      status: toStatus,
+      previousStatus: fromStatus,
+      timestamp: now,
+    });
+
+    if (toStatus === "OFFLINE") {
+      try {
+        const event = await prisma.event.create({
+          data: {
+            type: "DEVICE_STATUS_CHANGE",
+            severity: "CRITICAL",
+            status: "OPEN",
+            title: `[${camera.id}] ${camera.name} OFFLINE (Kamera CCTV Mati)`,
+            message: statusReason,
+            cameraId: camera.id,
+            siteId: camera.siteId,
+            zoneId: camera.zoneId,
+            dedupKey: `camera:${camera.id}:offline`,
+            occurredAt: now,
+          },
+        });
+
+        wsHub.broadcastEventAlarm({
+          id: String(event.id),
+          type: event.type,
+          severity: event.severity,
+          status: event.status,
+          title: event.title,
+          message: event.message,
+          deviceId: camera.id,
+          timestamp: now,
+        });
+      } catch (err) {
+        // ignore
+      }
+    } else if (toStatus === "ONLINE" && fromStatus === "OFFLINE") {
+      try {
+        await prisma.event.updateMany({
+          where: {
+            status: { in: ["OPEN", "ACKNOWLEDGED"] },
+            cameraId: camera.id,
+          },
+          data: {
+            status: "RESOLVED",
+            resolvedAt: now,
+            resolutionNote: "Kamera CCTV kembali ONLINE (Stream aktif)",
+          },
+        });
+      } catch (err) {
+        // ignore
+      }
+    }
+  }
+
+  return {
+    cameraId: camera.id,
+    status: toStatus,
+    streamStatus: toStreamStatus,
+    reason: statusReason,
+  };
 }

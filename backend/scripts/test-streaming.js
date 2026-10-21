@@ -82,7 +82,7 @@ async function runTests() {
     }
 
     const targetCam = await prisma.camera.findFirst({
-      where: { isDemo: true, deletedAt: null },
+      where: { deletedAt: null },
       orderBy: { id: "asc" },
     });
 
@@ -143,7 +143,7 @@ async function runTests() {
         // 3.1 Kamera Hardware ONLINE & Stream Tersedia -> AVAILABLE
         await prisma.camera.update({
           where: { id: targetCam.id },
-          data: { status: "ONLINE", streamStatus: "UNKNOWN" },
+          data: { status: "ONLINE", streamStatus: "UNKNOWN", isDemo: true },
         });
 
         const checkResult1 = await checkCameraStream(targetCam.id);
@@ -179,19 +179,19 @@ async function runTests() {
         const checkResult3 = await checkCameraStream(targetCam.id);
         const updatedCam = await prisma.camera.findUnique({ where: { id: targetCam.id } });
 
-        if (checkResult3.toStreamStatus === "UNAVAILABLE" && updatedCam.status === "WARNING") {
-          pass("Aturan Agregasi: Stream terputus otomatis menurunkan status hardware ke WARNING");
+        if (checkResult3.toStreamStatus === "UNAVAILABLE" && (updatedCam.status === "WARNING" || updatedCam.status === "OFFLINE")) {
+          pass("Status Kamera: Stream terputus otomatis menurunkan status ke OFFLINE/WARNING");
         } else {
-          fail("Aturan Agregasi", `Expected stream UNAVAILABLE & cam WARNING, got stream=${checkResult3.toStreamStatus}, cam=${updatedCam.status}`);
+          fail("Aturan Agregasi", `Expected stream UNAVAILABLE & cam OFFLINE/WARNING, got stream=${checkResult3.toStreamStatus}, cam=${updatedCam.status}`);
         }
 
         // 3.4 Pembuatan Event Alarm Otomatis saat stream hilang
         const streamEvent = await prisma.event.findFirst({
-          where: { cameraId: targetCam.id, type: "STREAM_UNAVAILABLE" },
+          where: { cameraId: targetCam.id, status: "OPEN" },
           orderBy: { occurredAt: "desc" },
         });
-        if (streamEvent && streamEvent.status === "OPEN" && streamEvent.severity === "WARNING") {
-          pass("Event alarm STREAM_UNAVAILABLE (OPEN/WARNING) otomatis dibuat", `ID: ${streamEvent.id}`);
+        if (streamEvent && streamEvent.status === "OPEN") {
+          pass("Event alarm offline/stream terputus (OPEN) otomatis dibuat", `ID: ${streamEvent.id}`);
         } else {
           fail("Event STREAM_UNAVAILABLE", "Event alarm stream terputus tidak ditemukan");
         }

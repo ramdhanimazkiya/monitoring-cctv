@@ -16,6 +16,8 @@ import monitoringRoutes from "./modules/monitoring/monitoring.routes.js";
 import streamingRoutes from "./modules/streaming/streaming.routes.js";
 import pagingRoutes from "./modules/paging/paging.routes.js";
 import userRoutes from "./modules/users/user.routes.js";
+import auditRoutes from "./modules/audit/audit.routes.js";
+import eventRoutes from "./modules/events/event.routes.js";
 
 // Polyfill serialisasi BigInt untuk respons JSON Prisma
 if (!BigInt.prototype.toJSON) {
@@ -76,6 +78,8 @@ export function createApp() {
   app.use("/api", streamingRoutes);
   app.use("/api", pagingRoutes);
   app.use("/api/users", userRoutes);
+  app.use("/api/audit-logs", auditRoutes);
+  app.use("/api/events", eventRoutes);
 
   // 7. Handler 404 & Global Error
   app.use(notFoundHandler);

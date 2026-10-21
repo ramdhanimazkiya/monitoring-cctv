@@ -155,6 +155,24 @@ class DeviceMonitoringService {
     const now = new Date();
     const fromStatus = device.status;
 
+    // Untuk kamera CCTV nyata: status harus mencerminkan ketersediaan aktual stream video
+    if (isCamera && (device.streamKey || device.adapterConfig?.streamUrl) && !device.isDemo) {
+      try {
+        const streamRes = await checkCameraStream(device);
+        if (streamRes) {
+          return {
+            deviceId: device.id,
+            fromStatus,
+            toStatus: streamRes.status,
+            latencyMs: streamRes.latencyMs,
+            ok: streamRes.status === "ONLINE",
+          };
+        }
+      } catch (err) {
+        logger.warn({ err }, `Gagal memeriksa stream kamera ${device.id}`);
+      }
+    }
+
     let pingResult;
     try {
       pingResult = await pingDevice(device, this.settings.timeoutMs);
@@ -195,7 +213,7 @@ class DeviceMonitoringService {
       this.consecutiveSuccesses.set(device.id, 0);
       nextFailures += 1;
 
-      if (nextFailures >= this.settings.offlineAfterFailures) {
+      if (fromStatus === "UNKNOWN" || nextFailures >= this.settings.offlineAfterFailures) {
         toStatus = "OFFLINE";
         statusReason = pingResult.reason || `Tidak merespons setelah ${nextFailures}x percobaan`;
       } else {
@@ -243,21 +261,21 @@ class DeviceMonitoringService {
           },
         });
 
-        // 2. Buat Event Alarm jika masuk status OFFLINE atau WARNING
-        if (toStatus === "OFFLINE" || toStatus === "WARNING") {
+        // 2. Buat Event Alarm HANYA jika perangkat berubah menjadi OFFLINE
+        if (toStatus === "OFFLINE") {
           const event = await prisma.event.create({
             data: {
               type: "DEVICE_STATUS_CHANGE",
-              severity: toStatus === "OFFLINE" ? "CRITICAL" : "WARNING",
+              severity: "CRITICAL",
               status: "OPEN",
-              title: `[${device.id}] ${device.name} berubah status menjadi ${toStatus}`,
+              title: `[${device.id}] ${device.name} berubah status menjadi OFFLINE`,
               message: statusReason,
               cameraId: isCamera ? device.id : null,
               audioDeviceId: !isCamera ? device.id : null,
               siteId: device.siteId,
               zoneId: device.zoneId,
               statusHistoryId: history.id,
-              dedupKey: `device:${device.id}:status`,
+              dedupKey: `device:${device.id}:offline`,
               occurredAt: now,
             },
           });
@@ -271,6 +289,21 @@ class DeviceMonitoringService {
             message: event.message,
             deviceId: device.id,
             timestamp: now,
+          });
+        }
+
+        // 3. Jika perangkat pulih kembali ONLINE, otomatis selesaikan (RESOLVED) alarm OFFLINE terbuka
+        if (toStatus === "ONLINE" && fromStatus === "OFFLINE") {
+          await prisma.event.updateMany({
+            where: {
+              status: { in: ["OPEN", "ACKNOWLEDGED"] },
+              OR: [{ cameraId: device.id }, { audioDeviceId: device.id }],
+            },
+            data: {
+              status: "RESOLVED",
+              resolvedAt: now,
+              resolutionNote: "Perangkat pulih otomatis kembali ONLINE (Koneksi normal)",
+            },
           });
         }
 

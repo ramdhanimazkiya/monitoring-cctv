@@ -82,11 +82,19 @@ export async function pingTcp(host, port, timeoutMs = 5000) {
  * Dispatcher ping perangkat berdasarkan adapterType.
  */
 export async function pingDevice(device, timeoutMs = 5000) {
-  // Jika tipe mock atau belum ada host/port, gunakan mock
-  if (device.adapterType === "mock" || !device.host || !device.port) {
+  // Hanya jika perangkat secara eksplisit merupakan perangkat simulasi demo (isDemo)
+  if (device.isDemo) {
     return pingMock(device, timeoutMs);
   }
 
-  // Jika adapter tcp / onvif / rtsp / generic port
-  return pingTcp(device.host, device.port, timeoutMs);
+  // Jika host & port terkonfigurasi, uji koneksi TCP
+  if (device.host && device.port) {
+    return pingTcp(device.host, device.port, timeoutMs);
+  }
+
+  return {
+    ok: false,
+    latencyMs: 0,
+    reason: "Host atau port perangkat belum dikonfigurasi",
+  };
 }

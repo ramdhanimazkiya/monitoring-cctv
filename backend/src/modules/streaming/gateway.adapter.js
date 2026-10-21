@@ -57,10 +57,36 @@ export class StreamGatewayAdapter {
   }
 
   /**
-   * Memeriksa apakah stream aktif pada gateway media.
+   * Mengekstrak nama path pada MediaMTX dari streamKey, adapterConfig, atau streamUrl.
+   */
+  extractPathName(camera) {
+    if (camera.streamKey && !camera.streamKey.startsWith("http")) {
+      return camera.streamKey.trim().replace(/^\//, "").replace(/\/$/, "");
+    }
+    const url = camera.adapterConfig?.streamUrl || camera.streamKey || "";
+    if (url) {
+      try {
+        const parsed = new URL(url);
+        const parts = parsed.pathname.split("/").filter(Boolean);
+        if (parts.length > 0) {
+          if (parts[parts.length - 1] === "index.m3u8" || parts[parts.length - 1] === "whep") {
+            return parts.slice(0, parts.length - 1).join("/");
+          }
+          return parts.join("/");
+        }
+      } catch {
+        // Bukan URL
+      }
+    }
+    return camera.id ? camera.id.toLowerCase() : null;
+  }
+
+  /**
+   * Memeriksa apakah sumber video CCTV aktif pada gateway media.
    */
   async checkStreamAvailability(camera) {
-    if (!camera.streamKey) {
+    const pathName = this.extractPathName(camera);
+    if (!pathName && !camera.streamKey && !camera.adapterConfig?.streamUrl) {
       return {
         available: false,
         status: "NOT_CONFIGURED",
@@ -68,21 +94,12 @@ export class StreamGatewayAdapter {
       };
     }
 
-    // Jika perangkat hardware mati (OFFLINE), stream pasti UNAVAILABLE
-    if (camera.status === "OFFLINE") {
-      return {
-        available: false,
-        status: "UNAVAILABLE",
-        reason: "Kamera hardware OFFLINE, tidak ada sinyal stream",
-      };
-    }
-
-    // Jika mode mock atau simulasi demo
-    if (this.gatewayType === "mock" || camera.adapterType === "mock" || camera.isDemo) {
+    // Jika mode mock atau simulasi demo eksplisit
+    if (this.gatewayType === "mock" || camera.isDemo) {
       return this.checkMockStream(camera);
     }
 
-    // Cek ke API MediaMTX / go2rtc nyata
+    // Cek ke API MediaMTX nyata
     return this.checkRealGatewayStream(camera);
   }
 
@@ -97,6 +114,7 @@ export class StreamGatewayAdapter {
       return {
         available: false,
         status: "UNAVAILABLE",
+        latencyMs: 0,
         reason: "Simulasi kehilangan sinyal video (video loss)",
         telemetry: { fps: 0, bitrateKbps: 0 },
       };
@@ -106,6 +124,7 @@ export class StreamGatewayAdapter {
     return {
       available: true,
       status: "AVAILABLE",
+      latencyMs: 18,
       reason: "Stream aktif pada Media Gateway (Simulasi Demo)",
       telemetry: {
         fps: 25,
@@ -118,72 +137,133 @@ export class StreamGatewayAdapter {
   }
 
   /**
-   * Pengecekan ke API MediaMTX nyata (/v3/paths/get/:name).
+   * Pengecekan status aktual stream kamera CCTV.
+   * Menggunakan API MediaMTX /v3/paths/list:
+   * const cameraPath = data.items.find(item => item.name === pathName);
+   * const isOnline = Boolean(cameraPath && cameraPath.source);
+   * - ONLINE (AVAILABLE): Kamera hidup dan aktif mem-publish frame video (cameraPath.source != null).
+   * - OFFLINE (UNAVAILABLE): Kamera mati, terputus, atau belum mem-publish sinyal video.
    */
   async checkRealGatewayStream(camera) {
+    const pathName = this.extractPathName(camera) || camera.streamKey;
+    const start = performance.now();
+
+    // 1. Pengecekan MediaMTX API spesifik per kamera (/v3/paths/get/{name})
     try {
-      const response = await fetch(`${this.apiUrl}/v3/paths/get/${encodeURIComponent(camera.streamKey)}`, {
+      const cleanPath = pathName ? pathName.replace(/^\//, "").replace(/\/$/, "") : "";
+      const response = await fetch(`${this.apiUrl}/v3/paths/get/${cleanPath}`, {
         signal: AbortSignal.timeout(3000),
       });
+      const latencyMs = Math.round(performance.now() - start);
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          return {
-            available: false,
-            status: "UNAVAILABLE",
-            reason: `Stream path '${camera.streamKey}' tidak ditemukan pada Media Gateway`,
-          };
-        }
+      if (response.ok) {
+        const data = await response.json();
+        const isOnline = Boolean(data && data.source);
+
+        return {
+          available: isOnline,
+          status: isOnline ? "AVAILABLE" : "UNAVAILABLE",
+          latencyMs: isOnline ? Math.max(1, latencyMs) : null,
+          reason: isOnline
+            ? `Sumber video CCTV aktif (${data.source?.type || "Online"})`
+            : "Sumber video CCTV mati / kamera offline (source: null)",
+          telemetry: {
+            tracks: data.tracks?.length || 0,
+            readers: data.readers?.length || 0,
+            bytesReceived: data.bytesReceived || 0,
+          },
+        };
+      } else if (response.status === 404) {
         return {
           available: false,
           status: "UNAVAILABLE",
-          reason: `Gateway HTTP Error: ${response.status}`,
+          latencyMs: null,
+          reason: `Stream path '${cleanPath}' tidak ditemukan / kamera mati (404)`,
+          telemetry: null,
         };
       }
-
-      const data = await response.json();
-      const isReady = data.ready === true;
-
-      return {
-        available: isReady,
-        status: isReady ? "AVAILABLE" : "UNAVAILABLE",
-        reason: isReady ? "Stream aktif dan terhubung" : "Stream terdaftar namun belum siap (not ready)",
-        telemetry: {
-          tracks: data.tracks?.length || 0,
-          readers: data.readers?.length || 0,
-        },
-      };
     } catch (err) {
-      // Jika gateway offline/belum dinyalakan, fallback dengan penanganan ramah
-      logger.debug({ err: err.message }, "Media Gateway API tidak dapat dijangkau");
-      // Jika kamera demo, fallback ke status demo
-      if (camera.isDemo) {
-        return this.checkMockStream(camera);
-      }
-      return {
-        available: false,
-        status: "UNAVAILABLE",
-        reason: `Media Gateway tidak dapat dijangkau: ${err.message}`,
-      };
+      // Fallback ke pengecekan WHEP jika fetch API gagal
     }
+
+    // 2. Fallback WHEP jika ada custom URL
+    const customUrl =
+      camera.adapterConfig?.streamUrl ||
+      (camera.streamKey && camera.streamKey.startsWith("http") ? camera.streamKey : null);
+
+    if (customUrl) {
+      const cleanUrl = customUrl.replace(/\/$/, "");
+      const whepUrl = cleanUrl.endsWith("/whep") ? cleanUrl : `${cleanUrl}/whep`;
+
+      try {
+        const whepStart = performance.now();
+        const whepRes = await fetch(whepUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/sdp" },
+          body: "v=0\r\no=- 0 0 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\nc=IN IP4 0.0.0.0\r\na=recvonly\r\n",
+          signal: AbortSignal.timeout(3000),
+        });
+        const latencyMs = Math.round(performance.now() - whepStart);
+
+        if (whepRes.status === 201) {
+          return {
+            available: true,
+            status: "AVAILABLE",
+            latencyMs,
+            reason: "Sumber video CCTV aktif dan mengalirkan frame video",
+          };
+        }
+
+        return {
+          available: false,
+          status: "UNAVAILABLE",
+          latencyMs,
+          reason: "Sumber video CCTV mati / kamera tidak mengirim sinyal video",
+        };
+      } catch (err) {
+        // Fallback
+      }
+    }
+
+    if (camera.isDemo) {
+      return this.checkMockStream(camera);
+    }
+
+    return {
+      available: false,
+      status: "UNAVAILABLE",
+      latencyMs: 0,
+      reason: `Sumber video CCTV mati / tidak dapat dijangkau`,
+    };
   }
 
   /**
-   * Memeriksa kesehatan Media Gateway secara umum.
+   * Memeriksa kesehatan & konektivitas server MediaMTX secara terpisah.
    */
   async getGatewayHealth() {
+    const start = performance.now();
     try {
       const res = await fetch(`${this.apiUrl}/v3/paths/list`, {
         signal: AbortSignal.timeout(2000),
       });
+      const latencyMs = Math.round(performance.now() - start);
       if (res.ok) {
         const data = await res.json();
+        const items = data.items || [];
         return {
           connected: true,
+          status: "ONLINE",
+          latencyMs,
           gatewayType: this.gatewayType,
           gatewayUrl: this.gatewayUrl,
           apiUrl: this.apiUrl,
-          activePathsCount: data.items?.length || 0,
+          activePathsCount: items.length,
+          paths: items.map((p) => ({
+            name: p.name,
+            ready: p.ready === true,
+            tracks: p.tracks?.length || 0,
+            readers: p.readers?.length || 0,
+          })),
         };
       }
     } catch {
@@ -192,12 +272,55 @@ export class StreamGatewayAdapter {
 
     return {
       connected: false,
+      status: "OFFLINE",
+      latencyMs: null,
       gatewayType: this.gatewayType,
       gatewayUrl: this.gatewayUrl,
       apiUrl: this.apiUrl,
       activePathsCount: 0,
-      note: "Media Gateway eksternal belum dijalankan; sistem berjalan dalam mode fallback/simulasi demo.",
+      paths: [],
+      note: "Server MediaMTX tidak dapat dijangkau",
     };
+  }
+
+  /**
+   * Mengambil daftar path mentah langsung dari API MediaMTX (/v3/paths/list).
+   */
+  async getPathsList() {
+    try {
+      const res = await fetch(`${this.apiUrl}/v3/paths/list`, {
+        signal: AbortSignal.timeout(3500),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      logger.warn({ err }, "Gagal mengambil daftar paths dari MediaMTX API");
+    }
+    return { itemCount: 0, pageCount: 0, items: [] };
+  }
+
+  /**
+   * Mengambil info 1 path kamera spesifik langsung dari API MediaMTX (/v3/paths/get/{name}).
+   */
+  async getPath(pathName) {
+    const cleanPath = pathName ? pathName.replace(/^\//, "").replace(/\/$/, "") : "";
+    if (!cleanPath) return { status: "error", error: "path name required" };
+
+    try {
+      const res = await fetch(`${this.apiUrl}/v3/paths/get/${cleanPath}`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+      if (res.status === 404) {
+        return { notFound: true, status: "error", error: "path not found" };
+      }
+    } catch (err) {
+      logger.warn({ err }, `Gagal mengambil path '${cleanPath}' dari MediaMTX API`);
+    }
+    return { notFound: true, status: "error", error: "gateway unreachable" };
   }
 
   /**

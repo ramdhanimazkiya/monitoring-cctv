@@ -4,6 +4,7 @@ import { wsHub } from "../../websocket/hub.js";
 import { leaseService } from "./lease.service.js";
 import { resolveAudioTargets } from "./target.resolver.js";
 import { ttsEngine } from "./tts.engine.js";
+import { recordAuditLog } from "../../services/audit.service.js";
 import { NotFoundError, BadRequestError, ConflictError } from "../../utils/errors.js";
 
 /**
@@ -32,7 +33,7 @@ export async function startPttSession(user, { targetType, targetId, targetIds, d
   const now = new Date();
 
   // 4. Buat record AudioCommand & akuisisi lease kanal dalam transaksi
-  return await prisma.$transaction(async (tx) => {
+  const sessionResult = await prisma.$transaction(async (tx) => {
     // 4.1 Buat baris AudioCommand
     const command = await tx.audioCommand.create({
       data: {
@@ -108,6 +109,18 @@ export async function startPttSession(user, { targetType, targetId, targetIds, d
       skippedOffline: offline.map((d) => ({ id: d.id, name: d.name })),
     };
   });
+
+  await recordAuditLog({
+    userId: user.id,
+    actorUsername: user.username,
+    action: "AUDIO_PTT_START",
+    entityType: "audio_command",
+    entityId: sessionResult.commandId,
+    message: `Memulai transmisi PTT ke ${activeDevices.length} perangkat speaker`,
+    after: { targetType, targetId, targetIds, activeDevices: activeDevices.map((d) => d.id) },
+  });
+
+  return sessionResult;
 }
 
 /**
@@ -157,7 +170,7 @@ export async function stopPttSession(user, { commandId }) {
 
   const now = new Date();
 
-  return await prisma.$transaction(async (tx) => {
+  const stopResult = await prisma.$transaction(async (tx) => {
     // 1. Lepaskan lease kanal audio
     const releasedDeviceIds = await leaseService.releaseLeases(tx, {
       commandId: bigCommandId,
@@ -214,6 +227,18 @@ export async function stopPttSession(user, { commandId }) {
       releasedDevices: releasedDeviceIds,
     };
   });
+
+  await recordAuditLog({
+    userId: user.id,
+    actorUsername: user.username,
+    action: "AUDIO_PTT_STOP",
+    entityType: "audio_command",
+    entityId: String(commandId),
+    message: `Menghentikan transmisi PTT. Status akhir: ${stopResult.status}`,
+    after: { commandId: String(commandId), status: stopResult.status, releasedDevices: stopResult.releasedDevices },
+  });
+
+  return stopResult;
 }
 
 /**
@@ -288,6 +313,16 @@ export async function dispatchTtsMessage(user, { text, language = "id-ID", voice
     status: commandStatus,
     targetCount: targetResults.length,
     durationSeconds,
+  });
+
+  await recordAuditLog({
+    userId: user.id,
+    actorUsername: user.username,
+    action: "AUDIO_TTS_BROADCAST",
+    entityType: "audio_command",
+    entityId: result.id.toString(),
+    message: `Menyiarkan pesan suara TTS ke ${devices.length} perangkat speaker`,
+    after: { text, language, voice, deviceIds: devices.map((d) => d.id) },
   });
 
   return {

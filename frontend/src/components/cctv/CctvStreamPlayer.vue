@@ -1,20 +1,8 @@
 <template>
   <div ref="containerRef" :class="['relative overflow-hidden bg-black select-none group', aspectRatio]">
-    <!-- 1. MediaMTX / WebRTC Web Page Stream Embed (via iframe) -->
-    <iframe
-      v-if="isWebPlayerStream"
-      ref="iframeRef"
-      :src="iframeUrl"
-      class="w-full h-full border-0 absolute inset-0 z-10 bg-black"
-      allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-      allowfullscreen
-      @load="onIframeLoad"
-      @error="onIframeError"
-    ></iframe>
-
-    <!-- 2. Direct Video Element for HLS (.m3u8) or standard MP4/WebM files -->
+    <!-- Direct Video Element for HLS (.m3u8) or standard files -->
     <video
-      v-else
+      v-show="!isWebPlayerStream && !isOffline"
       ref="videoRef"
       class="w-full h-full object-cover z-10 relative bg-black"
       :autoplay="autoplay"
@@ -28,9 +16,21 @@
       @error="onError"
     ></video>
 
-    <!-- Loading Spinner Overlay -->
+    <!-- MediaMTX Built-in WebRTC Web Player Iframe (https://stream.zakuyu.fun/...) -->
+    <iframe
+      v-show="isWebPlayerStream && !isOffline"
+      ref="iframeRef"
+      :src="iframeUrl"
+      class="w-full h-full border-0 pointer-events-auto relative z-10"
+      allow="autoplay; fullscreen; encrypted-media; camera; microphone"
+      loading="lazy"
+      @load="onIframeLoad"
+      @error="onIframeError"
+    ></iframe>
+
+    <!-- Loading Spinner Overlay (Hanya saat Online dan sedang menghubungkan) -->
     <div
-      v-if="isLoading && !hasError"
+      v-if="isLoading && !hasError && !isOffline"
       class="absolute inset-0 z-20 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-3 text-center pointer-events-none"
     >
       <div class="w-8 h-8 rounded-full border-2 border-blue-500/30 border-t-blue-400 animate-spin mb-2"></div>
@@ -38,12 +38,52 @@
       <span class="text-[9px] font-mono text-slate-500 truncate max-w-[200px] mt-0.5">{{ cameraName || cameraId }}</span>
     </div>
 
-    <!-- Fallback / Error State Overlay (Jika stream gagal dimuat setelah retry) -->
+    <!-- Blank Hitam + Teks Error ketika Status CCTV Offline (Instant v-show) -->
     <div
-      v-if="hasError"
+      v-show="isOffline"
+      class="absolute inset-0 z-20 bg-black flex flex-col items-center justify-center p-4 text-center select-none"
+      style="background-color: #000000 !important;"
+    >
+      <!-- Top Header Overlay if showOverlay is true (Standalone mode) -->
+      <div
+        v-if="showOverlay"
+        class="absolute top-0 inset-x-0 bg-gradient-to-b from-black/95 via-black/70 to-transparent p-2.5 flex items-center justify-between z-30 text-xs pointer-events-auto"
+      >
+        <div class="flex items-center gap-2 min-w-0 font-mono">
+          <span
+            v-if="cameraId"
+            class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-950/90 text-blue-300 border border-blue-500/60 shrink-0 shadow-sm"
+          >
+            {{ cameraId }}
+          </span>
+          <span
+            v-if="cameraName || cameraId"
+            class="text-slate-100 font-semibold truncate text-[11px] drop-shadow-sm"
+            :title="cameraName || cameraId"
+          >
+            {{ cameraName || cameraId }}
+          </span>
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold flex items-center gap-1 shadow-sm bg-rose-950/90 text-rose-300 border border-rose-500/70">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+            OFFLINE
+          </span>
+        </div>
+      </div>
+
+      <p class="font-mono text-xs sm:text-sm text-white font-medium tracking-wide">
+        error: stream not found, retrying in some second
+      </p>
+    </div>
+
+    <!-- Error Overlay Lainnya (URL belum dikonfigurasi) -->
+    <div
+      v-if="hasError && !isOffline"
       class="absolute inset-0 z-20 bg-[#090e18]/95 flex flex-col items-center justify-center p-4 text-center select-none space-y-2.5"
     >
-      <div class="w-10 h-10 rounded-xl bg-blue-950/70 border border-blue-500/40 flex items-center justify-center text-blue-400">
+      <div class="w-10 h-10 rounded-xl bg-rose-950/70 border border-rose-500/40 flex items-center justify-center text-rose-400">
         <Video class="w-5 h-5 animate-pulse" />
       </div>
 
@@ -51,8 +91,8 @@
         <span class="font-mono text-xs text-slate-200 font-bold block truncate max-w-[260px]">
           {{ cameraName || cameraId }}
         </span>
-        <span class="font-mono text-[10px] text-amber-400 block mt-0.5">
-          {{ errorMessage || 'Mencoba menghubungkan ulang stream...' }}
+        <span class="font-mono text-[10px] text-rose-400 block mt-0.5">
+          {{ errorMessage || 'Koneksi stream CCTV belum tersedia' }}
         </span>
       </div>
 
@@ -76,9 +116,9 @@
       </div>
     </div>
 
-    <!-- Live Status Indicators -->
+    <!-- Live Status Indicators (Hanya tampil saat Online) -->
     <div
-      v-if="showOverlay && isPlaying"
+      v-if="showOverlay && isPlaying && !isOffline"
       class="absolute top-2 left-2 z-25 flex items-center gap-1.5 pointer-events-none"
     >
       <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/60 shadow flex items-center gap-1">
@@ -93,9 +133,9 @@
       </span>
     </div>
 
-    <!-- Bottom Right Quick Floating Video Controls -->
+    <!-- Bottom Right Quick Floating Video Controls (Hanya tampil saat Online) -->
     <div
-      v-if="showOverlay"
+      v-if="showOverlay && !isOffline"
       class="absolute bottom-2 right-2 z-25 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/75 backdrop-blur-xs p-1 rounded-md border border-white/10 text-slate-300"
     >
       <!-- Mute/Unmute Toggle Button (Hanya jika direct video) -->
@@ -170,6 +210,10 @@ const props = defineProps({
   aspectRatio: {
     type: String,
     default: 'aspect-video'
+  },
+  status: {
+    type: String,
+    default: ''
   }
 })
 
@@ -186,7 +230,13 @@ const isMuted = ref(props.muted)
 
 let hlsInstance = null
 let retryCount = 0
+let loadTimer = null
 const MAX_RETRIES = 3
+
+// Status Offline didapat secara reaktif dari props.status (instan 0ms)
+const isOffline = computed(() => {
+  return !props.status || props.status.toUpperCase() === 'OFFLINE'
+})
 
 // Cek apakah URL berformat HLS playlist (.m3u8)
 const isHlsStream = computed(() => {
@@ -211,7 +261,7 @@ const isDirectVideo = computed(() => {
   )
 })
 
-// Jika bukan .m3u8 dan bukan file video, maka URL web player (seperti MediaMTX WebRTC Reader https://stream.zakuyu.fun/...)
+// Jika bukan .m3u8 dan bukan file video, maka URL web player (MediaMTX stream page https://stream.zakuyu.fun/...)
 const isWebPlayerStream = computed(() => {
   if (!props.streamUrl) return false
   return !isHlsStream.value && !isDirectVideo.value && props.streamUrl.startsWith('http')
@@ -219,11 +269,17 @@ const isWebPlayerStream = computed(() => {
 
 const iframeUrl = computed(() => {
   if (!props.streamUrl) return ''
-  const sep = props.streamUrl.includes('?') ? '&' : '?'
-  return `${props.streamUrl}${sep}autoplay=true&muted=true&controls=${props.controls ? 'true' : 'false'}&playsinline=true`
+  const clean = props.streamUrl.replace(/\/whep$/, '').replace(/\/index\.m3u8$/, '')
+  const base = clean.endsWith('/') ? clean : `${clean}/`
+  const sep = base.includes('?') ? '&' : '?'
+  return `${base}${sep}autoplay=true&muted=true&controls=${props.controls ? 'true' : 'false'}&playsinline=true`
 })
 
-function destroyHls() {
+function destroyPlayer() {
+  if (loadTimer) {
+    clearTimeout(loadTimer)
+    loadTimer = null
+  }
   if (hlsInstance) {
     try {
       hlsInstance.destroy()
@@ -232,13 +288,30 @@ function destroyHls() {
     }
     hlsInstance = null
   }
+  if (videoRef.value) {
+    try {
+      videoRef.value.pause()
+      videoRef.value.removeAttribute('src')
+      videoRef.value.load()
+    } catch (e) {
+      // ignore
+    }
+  }
 }
 
 function initPlayer() {
-  destroyHls()
+  destroyPlayer()
   isLoading.value = true
   hasError.value = false
+  isPlaying.value = false
   errorMessage.value = ''
+
+  // Jika status kamera offline, jangan inisialisasi player
+  if (isOffline.value) {
+    isLoading.value = false
+    isPlaying.value = false
+    return
+  }
 
   if (!props.streamUrl) {
     isLoading.value = false
@@ -247,19 +320,19 @@ function initPlayer() {
     return
   }
 
-  // Jika WebRTC / MediaMTX Web Player Iframe
+  // 1. Jika MediaMTX WebRTC Stream Page (iframe)
   if (isWebPlayerStream.value) {
     if (iframeRef.value) {
       iframeRef.value.src = iframeUrl.value
     }
-    // Set fallback timeout agar loading indicator tidak macet
-    setTimeout(() => {
+    loadTimer = setTimeout(() => {
       isLoading.value = false
       isPlaying.value = true
-    }, 1500)
+    }, 1200)
     return
   }
 
+  // 2. Jika HLS atau Direct Video
   const video = videoRef.value
   if (!video) return
 
@@ -269,7 +342,6 @@ function initPlayer() {
   video.setAttribute('playsinline', 'true')
   video.setAttribute('webkit-playsinline', 'true')
 
-  // Cek apakah format HLS dan didukung oleh Hls.js
   if (isHlsStream.value && Hls.isSupported()) {
     hlsInstance = new Hls({
       enableWorker: true,
@@ -286,7 +358,7 @@ function initPlayer() {
     hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
       if (props.autoplay) {
         video.play().catch((err) => {
-          console.warn('Autoplay tertahan oleh browser:', err)
+          console.warn('Autoplay tertahan browser:', err)
         })
       }
     })
@@ -295,23 +367,21 @@ function initPlayer() {
       if (data.fatal) {
         switch (data.type) {
           case Hls.ErrorTypes.NETWORK_ERROR:
-            console.warn('HLS Network error, mencoba memulihkan...', data)
             if (retryCount < MAX_RETRIES) {
               retryCount++
               hlsInstance.startLoad()
             } else {
               hasError.value = true
-              errorMessage.value = 'Koneksi stream terputus'
+              errorMessage.value = 'Koneksi stream CCTV terputus'
               isLoading.value = false
               emit('error', data)
             }
             break
           case Hls.ErrorTypes.MEDIA_ERROR:
-            console.warn('HLS Media error, mencoba memulihkan...', data)
             hlsInstance.recoverMediaError()
             break
           default:
-            destroyHls()
+            destroyPlayer()
             hasError.value = true
             errorMessage.value = 'Gagal memutar siaran stream'
             isLoading.value = false
@@ -321,13 +391,11 @@ function initPlayer() {
       }
     })
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    // Dukungan native HLS (Safari/iOS)
     video.src = props.streamUrl
     if (props.autoplay) {
       video.play().catch(() => {})
     }
   } else {
-    // Standard format (MP4, WebM)
     video.src = props.streamUrl
     if (props.autoplay) {
       video.play().catch(() => {})
@@ -398,10 +466,27 @@ function openDirect() {
 watch(
   () => props.streamUrl,
   (newUrl) => {
-    if (newUrl) {
+    if (newUrl && !isOffline.value) {
       initPlayer()
     }
   }
+)
+
+watch(
+  () => props.status,
+  (newStatus, oldStatus) => {
+    const isNowOnline = newStatus?.toUpperCase() === 'ONLINE'
+    const wasOffline = !oldStatus || oldStatus?.toUpperCase() === 'OFFLINE'
+
+    if (isNowOnline && wasOffline) {
+      // CCTV pulih online: inisialisasi ulang pemutar video
+      initPlayer()
+    } else if (!isNowOnline) {
+      // CCTV mati/offline: segera hentikan pemutar video lokal
+      destroyPlayer()
+    }
+  },
+  { immediate: true }
 )
 
 onMounted(() => {
@@ -409,6 +494,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  destroyHls()
+  destroyPlayer()
 })
 </script>

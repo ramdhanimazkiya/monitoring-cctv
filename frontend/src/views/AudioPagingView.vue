@@ -5,8 +5,8 @@
       <div>
         <div class="flex items-center gap-2">
           <h2 class="text-lg font-bold text-slate-100 tracking-tight">Audio Paging Console</h2>
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 shadow-xs">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800/80 text-slate-300 border border-slate-700/60 shadow-xs">
+            <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
             WHIP 16kHz MONO
           </span>
         </div>
@@ -25,7 +25,7 @@
           @click="pingCurrentSpeaker(false)"
         >
           <Radio :class="['w-3.5 h-3.5 text-blue-400', pingLoading ? 'animate-spin' : 'animate-pulse']" />
-          <span>{{ pingLoading ? 'Ping...' : `Auto-Ping: ${currentSpeakerLatency}ms` }}</span>
+          <span>{{ pingLoading ? 'Ping...' : `Auto-Ping: ${currentSpeakerLatency !== null ? `${currentSpeakerLatency}ms` : '-'}` }}</span>
         </button>
 
         <div class="hidden sm:flex items-center gap-2 bg-[#111827] border border-[#283548] px-3 py-1.5 rounded-md text-xs font-mono text-slate-300">
@@ -84,8 +84,33 @@
             >
               <!-- Top Indicators -->
               <div class="absolute top-3 left-4 text-[10px] font-mono text-slate-400 flex items-center gap-1.5">
-                <span :class="['w-2 h-2 rounded-full', isTransmitting ? 'bg-rose-500 animate-ping' : 'bg-emerald-500']"></span>
-                <span>STATUS: <strong :class="isTransmitting ? 'text-rose-400' : 'text-emerald-400'">{{ isTransmitting ? 'TRANSMITTING' : currentSpeakerStatus }}</strong></span>
+                <span
+                  :class="[
+                    'w-2 h-2 rounded-full',
+                    isTransmitting
+                      ? 'bg-rose-500 animate-ping'
+                      : currentSpeakerStatus === 'ONLINE'
+                      ? 'bg-emerald-400'
+                      : currentSpeakerStatus === 'OFFLINE'
+                      ? 'bg-rose-400'
+                      : 'bg-slate-400'
+                  ]"
+                ></span>
+                <span>STATUS:
+                  <strong
+                    :class="[
+                      isTransmitting
+                        ? 'text-rose-400'
+                        : currentSpeakerStatus === 'ONLINE'
+                        ? 'text-emerald-400'
+                        : currentSpeakerStatus === 'OFFLINE'
+                        ? 'text-rose-400'
+                        : 'text-slate-400'
+                    ]"
+                  >
+                    {{ isTransmitting ? 'TRANSMITTING' : (currentSpeakerStatus || 'UNKNOWN') }}
+                  </strong>
+                </span>
               </div>
 
               <div class="absolute top-3 right-4 text-[11px] font-mono">
@@ -94,7 +119,18 @@
                   ON AIR: {{ formattedDuration }}
                 </span>
                 <span v-else class="text-slate-400 flex items-center gap-1.5">
-                  <span class="text-emerald-400 font-bold">{{ currentSpeakerLatency }}ms</span>
+                  <span
+                    :class="[
+                      'font-bold',
+                      currentSpeakerStatus === 'ONLINE'
+                        ? 'text-emerald-400'
+                        : currentSpeakerStatus === 'OFFLINE'
+                        ? 'text-rose-400'
+                        : 'text-slate-400'
+                    ]"
+                  >
+                    {{ currentSpeakerLatency !== null ? `${currentSpeakerLatency}ms` : '-' }}
+                  </span>
                   <span>latensi</span>
                 </span>
               </div>
@@ -127,9 +163,9 @@
                         : 'MULAI BICARA'
                     }}
                   </span>
-                  <span class="text-[10px] font-mono opacity-80 mt-0.5">
+                  <!-- <span class="text-[10px] font-mono opacity-80 mt-0.5">
                     {{ isTransmitting ? '(KLIK STOP)' : '(KLIK PTT)' }}
-                  </span>
+                  </span> -->
                 </button>
 
                 <!-- Status subtext -->
@@ -141,7 +177,7 @@
                     Menghubungkan WebRTC SDP 16kHz Mono ke {{ selectedWhipUrl }}...
                   </span>
                   <span v-else class="text-slate-400">
-                    Klik tombol untuk mulai bicara, klik lagi untuk selesai (kursor bebas bergerak).
+                    Klik tombol untuk mulai bicara, klik lagi untuk selesai.
                   </span>
                 </p>
               </div>
@@ -173,10 +209,21 @@
 
               <!-- Control Options (Toggle & Spacebar hint) -->
               <div class="mt-4 flex items-center justify-between w-full max-w-md pt-2 text-xs font-mono text-slate-400">
-                <span class="flex items-center gap-1.5 text-slate-300">
-                  <span :class="['w-2 h-2 rounded-full', isTransmitting ? 'bg-rose-400 animate-ping' : 'bg-emerald-400']"></span>
+                <!-- <span class="flex items-center gap-1.5 text-slate-300">
+                  <span
+                    :class="[
+                      'w-2 h-2 rounded-full',
+                      isTransmitting
+                        ? 'bg-rose-400 animate-ping'
+                        : currentSpeakerStatus === 'ONLINE'
+                        ? 'bg-emerald-400'
+                        : currentSpeakerStatus === 'OFFLINE'
+                        ? 'bg-rose-400'
+                        : 'bg-slate-400'
+                    ]"
+                  ></span>
                   <span>Mode: <strong>{{ isTransmitting ? 'TRANSMISI AKTIF' : 'KLIK UNTUK BICARA' }}</strong></span>
-                </span>
+                </span> -->
 
                 <span class="text-[11px] text-slate-400 bg-[#151d2e] px-2.5 py-1 rounded border border-[#283548]">
                   Pintasan Toggle: <kbd class="text-slate-200 font-bold font-mono">SPASI</kbd>
@@ -210,16 +257,29 @@
                       ? 'bg-rose-950 text-rose-300 border border-rose-800 animate-pulse'
                       : currentSpeakerStatus === 'ONLINE'
                       ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                      : 'bg-amber-950 text-amber-300 border border-amber-800'
+                      : currentSpeakerStatus === 'OFFLINE'
+                      ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                      : 'bg-slate-800 text-slate-400 border border-slate-700'
                   ]"
                 >
-                  <span :class="['w-1.5 h-1.5 rounded-full', isTransmitting ? 'bg-rose-400 animate-ping' : 'bg-emerald-400']"></span>
-                  {{ isTransmitting ? 'ON AIR' : currentSpeakerStatus }}
+                  <span
+                    :class="[
+                      'w-1.5 h-1.5 rounded-full',
+                      isTransmitting
+                        ? 'bg-rose-400 animate-ping'
+                        : currentSpeakerStatus === 'ONLINE'
+                        ? 'bg-emerald-400'
+                        : currentSpeakerStatus === 'OFFLINE'
+                        ? 'bg-rose-400'
+                        : 'bg-slate-400'
+                    ]"
+                  ></span>
+                  {{ isTransmitting ? 'ON AIR' : (currentSpeakerStatus || 'UNKNOWN') }}
                 </span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-slate-400">Latensi Respons:</span>
-                <span class="text-slate-200 font-medium">{{ currentSpeakerLatency }} ms</span>
+                <span class="text-slate-200 font-medium">{{ currentSpeakerLatency !== null ? `${currentSpeakerLatency} ms` : '-' }}</span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-slate-400">Format Input Mic:</span>
@@ -254,7 +314,7 @@
             </div>
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Server Host:</span>
-              <span class="text-slate-200 font-medium truncate max-w-[180px]">stream.zakuyu.fun</span>
+              <span class="text-slate-200 font-medium truncate max-w-[180px]">{{ serverHostname }}</span>
             </div>
           </div>
         </Card>
@@ -303,7 +363,7 @@ const toast = useToast()
 const whipAudio = useWhipAudio()
 const audioStore = useAudioDevicesStore()
 
-const pttTarget = ref('AUD-0001')
+const pttTarget = ref(audioStore.activeDevices[0]?.id || '')
 const pingLoading = ref(false)
 const sessionLogs = ref([])
 
@@ -311,38 +371,49 @@ const sessionLogs = ref([])
 const targetOptions = computed(() => {
   const options = audioStore.activeDevices.map(d => ({
     value: d.id,
-    label: `${d.id} - ${d.name} (${d.status})`
+    label: `${d.id} - ${d.name} (${d.status || 'UNKNOWN'})`
   }))
 
-  options.push(
-    { value: 'ZON-0001', label: 'ZON-0001 - Semua Speaker Zona Lobby' },
-    { value: 'ALL', label: 'ALL - Semua Speaker (Broadcast Seluruh Site)' }
-  )
+  if (options.length > 0) {
+    options.push(
+      { value: 'ALL', label: 'ALL - Semua Speaker (Broadcast Seluruh Site)' }
+    )
+  }
 
   return options
 })
 
 const selectedSpeaker = computed(() => {
-  if (pttTarget.value.startsWith('AUD-')) {
+  if (pttTarget.value && pttTarget.value.startsWith('AUD-')) {
     return audioStore.getDeviceById(pttTarget.value)
   }
   return null
 })
 
 const selectedWhipUrl = computed(() => {
-  return selectedSpeaker.value?.whipUrl || whipAudio.whipUrl.value
+  return selectedSpeaker.value?.whipUrl || ''
+})
+
+const serverHostname = computed(() => {
+  const url = selectedWhipUrl.value
+  if (!url) return '-'
+  try {
+    return new URL(url).hostname
+  } catch {
+    return url
+  }
 })
 
 const currentSpeakerStatus = computed(() => {
-  return selectedSpeaker.value?.status || 'ONLINE'
+  return selectedSpeaker.value?.status || 'UNKNOWN'
 })
 
 const currentSpeakerLatency = computed(() => {
-  return selectedSpeaker.value?.latencyMs || 24
+  return selectedSpeaker.value?.latencyMs ?? null
 })
 
 const currentSpeakerVolume = computed(() => {
-  return selectedSpeaker.value?.volume || 80
+  return selectedSpeaker.value?.volume ?? 0
 })
 
 const isTransmitting = computed(() => {
@@ -375,8 +446,15 @@ function handleTargetChange(targetId) {
 }
 
 async function pingCurrentSpeaker(isAuto = false) {
+  if (!selectedSpeaker.value) return
+  if (!selectedWhipUrl.value) {
+    if (!isAuto) {
+      toast.warning('URL Belum Dikonfigurasi', 'Speaker ini belum memiliki endpoint WHIP.')
+    }
+    return
+  }
   if (!isAuto) pingLoading.value = true
-  const targetId = pttTarget.value.startsWith('AUD-') ? pttTarget.value : 'AUD-0001'
+  const targetId = selectedSpeaker.value.id
   const result = await audioStore.pingDevice(targetId)
   if (!isAuto) pingLoading.value = false
 
@@ -400,6 +478,11 @@ function togglePtt() {
 async function startCurrentTransmission() {
   if (isTransmitting.value) return
 
+  if (!selectedWhipUrl.value) {
+    toast.error('URL WHIP Kosong', 'Target speaker belum memiliki URL endpoint WHIP.')
+    return
+  }
+
   // Update URL in composable
   whipAudio.whipUrl.value = selectedWhipUrl.value
 
@@ -410,6 +493,8 @@ async function startCurrentTransmission() {
     // Dynamically update status in store to ON AIR
     audioStore.setTransmissionStatus(pttTarget.value, true)
     toast.success('ON AIR: 16kHz Mono Aktif', `Siaran langsung terhubung ke ${pttTarget.value}`)
+  } else {
+    toast.error('Gagal Siaran Audio', whipAudio.publishError.value || 'Gagal memulai koneksi audio.')
   }
 }
 
@@ -457,19 +542,23 @@ function handleKeyDown(e) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown)
+  if (!pttTarget.value && audioStore.activeDevices.length > 0) {
+    pttTarget.value = audioStore.activeDevices[0].id
+  }
   // Ensure default target sync
-  handleTargetChange(pttTarget.value)
-
-  // Immediate initial ping
-  pingCurrentSpeaker(true)
-
-  // Auto-ping gateway every 3 seconds
-  pingInterval = setInterval(() => {
-    // Only auto-ping when not transmitting to preserve mic streaming bandwidth
-    if (!isTransmitting.value) {
+  if (pttTarget.value) {
+    handleTargetChange(pttTarget.value)
+    if (selectedWhipUrl.value) {
       pingCurrentSpeaker(true)
     }
-  }, 3000)
+  }
+
+  // Auto-ping gateway every 5 seconds only if speaker has endpoint
+  pingInterval = setInterval(() => {
+    if (!isTransmitting.value && selectedWhipUrl.value) {
+      pingCurrentSpeaker(true)
+    }
+  }, 5000)
 })
 
 onUnmounted(() => {

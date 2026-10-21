@@ -33,7 +33,7 @@ export const updateSiteSchema = z.object(siteShape).partial().strict().refine(co
 });
 
 const zoneShape = {
-  siteId: z.string().min(1, "Site ID wajib diisi"),
+  siteId: z.string().trim().optional().nullable(),
   name: z.string().trim().min(1, "Nama zona wajib diisi").max(120),
   description: z.string().trim().optional().nullable(),
   isActive: z.boolean().default(true),

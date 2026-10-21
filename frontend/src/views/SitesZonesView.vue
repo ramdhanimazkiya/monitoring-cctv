@@ -107,7 +107,7 @@
         <template #id="{ row }">
           <div class="flex items-center gap-1.5 font-mono">
             <span class="font-bold text-blue-400">{{ row.id }}</span>
-            <span class="text-[10px] text-slate-500" title="ID dibuat otomatis (Immutable)">[AUTO]</span>
+            <span class="text-[10px] text-slate-500" title="ID dibuat otomatis (Immutable)"></span>
           </div>
         </template>
 
@@ -250,7 +250,7 @@
         <template #id="{ row }">
           <div class="flex items-center gap-1.5 font-mono">
             <span class="font-bold text-purple-400">{{ row.id }}</span>
-            <span class="text-[10px] text-slate-500" title="ID dibuat otomatis oleh database (Immutable)">[AUTO]</span>
+            <span class="text-[10px] text-slate-500" title="ID dibuat otomatis oleh database (Immutable)"></span>
           </div>
         </template>
 
@@ -381,20 +381,21 @@
     <Modal
       v-model="zoneModalOpen"
       :title="zoneModalMode === 'create' ? 'Tambah Master Zona Baru' : `Edit Zona: ${activeZone.id}`"
-      description="ID zona dibuat otomatis berurutan (ZON-001) dan bersifat permanen."
+      description="ID zona dibuat otomatis oleh sistem ([AUTO GENERATE]) dan bersifat permanen."
       size="md"
     >
       <div class="space-y-3.5">
         <div class="p-2.5 rounded bg-[#151d2e] border border-[#283548] text-xs font-mono flex items-center justify-between">
           <span class="text-slate-400">ID Zona (Terkunci & Immutable): </span>
           <strong class="text-purple-400 font-bold">
-            {{ zoneModalMode === 'create' ? `[AUTO: ${previewNextZoneId}]` : activeZone.id }}
+            {{ zoneModalMode === 'create' ? '[AUTO GENERATE]' : activeZone.id }}
           </strong>
         </div>
 
         <Select
           v-model="activeZone.siteId"
-          label="Site Induk (Lokasi Gedung / Area)"
+          label="Pilih Site"
+          :placeholder="cctvStore.sites.length ? '-- Pilih Site --' : '-- Belum Ada Site Terdaftar --'"
           :options="siteSelectOptions"
           required
         />
@@ -431,14 +432,14 @@
     <Modal
       v-model="siteModalOpen"
       :title="siteModalMode === 'create' ? 'Tambah Master Site Baru' : `Edit Site: ${activeSite.id}`"
-      description="Site mewakili gedung atau area fasilitas utama. ID dibuat otomatis (SIT-001)."
+      description="Site mewakili gedung atau area fasilitas utama. ID dibuat otomatis oleh sistem ([AUTO GENERATE])."
       size="md"
     >
       <div class="space-y-3.5">
         <div class="p-2.5 rounded bg-[#151d2e] border border-[#283548] text-xs font-mono flex items-center justify-between">
           <span class="text-slate-400">ID Site (Terkunci & Immutable): </span>
           <strong class="text-blue-400 font-bold">
-            {{ siteModalMode === 'create' ? `[AUTO: ${previewNextSiteId}]` : activeSite.id }}
+            {{ siteModalMode === 'create' ? '[AUTO GENERATE]' : activeSite.id }}
           </strong>
         </div>
 
@@ -505,7 +506,7 @@ const sitePageSize = 5
 const siteCurrentPage = ref(1)
 
 const siteColumns = [
-  { key: 'id', label: 'ID Site (Auto)', width: 'w-28' },
+  { key: 'id', label: 'ID Site', width: 'w-28' },
   { key: 'name', label: 'Nama Site / Gedung' },
   { key: 'description', label: 'Keterangan' },
   { key: 'zoneCount', label: 'Zona Terdaftar', width: 'w-32' },
@@ -545,7 +546,7 @@ const zoneCurrentPage = ref(1)
 // Urutan Kolom Sesuai Permintaan:
 // id, site induk, zone, speaker terpasang (menampilkan id audio), cctv terpasang (menampilkan idcctv), status, aksi
 const zoneColumns = [
-  { key: 'id', label: 'ID Zona (Auto)', width: 'w-32' },
+  { key: 'id', label: 'ID Zona', width: 'w-32' },
   { key: 'site', label: 'Site Induk', width: 'w-48' },
   { key: 'zone', label: 'Nama Zona' },
   { key: 'speakers', label: 'Speaker Terpasang (ID Audio)' },
@@ -638,32 +639,10 @@ const activeSite = reactive({
 })
 
 const siteSelectOptions = computed(() => {
-  if (!cctvStore.sites.length) {
-    return [{ value: 'SIT-001', label: 'SIT-001 - Site Utama' }]
-  }
   return cctvStore.sites.map((s) => ({
     value: s.id,
     label: `${s.name} (${s.id})`
   }))
-})
-
-// Next ID Previews
-const previewNextSiteId = computed(() => {
-  const nums = cctvStore.sites.map((s) => {
-    const m = String(s.id).match(/\d+/)
-    return m ? parseInt(m[0], 10) : 0
-  })
-  const maxNum = nums.length > 0 ? Math.max(...nums) : 0
-  return `SIT-${String(maxNum + 1).padStart(3, '0')}`
-})
-
-const previewNextZoneId = computed(() => {
-  const nums = cctvStore.zones.map((z) => {
-    const m = String(z.id).match(/\d+/)
-    return m ? parseInt(m[0], 10) : 0
-  })
-  const maxNum = nums.length > 0 ? Math.max(...nums) : 0
-  return `ZON-${String(maxNum + 1).padStart(3, '0')}`
 })
 
 // -----------------------------------------------------------------------------
@@ -672,7 +651,7 @@ const previewNextZoneId = computed(() => {
 function openCreateZoneModal() {
   zoneModalMode.value = 'create'
   activeZone.id = ''
-  activeZone.siteId = cctvStore.sites[0]?.id || 'SIT-001'
+  activeZone.siteId = (selectedSiteFilter.value !== 'ALL' ? selectedSiteFilter.value : cctvStore.sites[0]?.id) || ''
   activeZone.name = ''
   activeZone.description = ''
   zoneModalOpen.value = true
@@ -681,7 +660,7 @@ function openCreateZoneModal() {
 function handleEditZone(row) {
   zoneModalMode.value = 'edit'
   activeZone.id = row.id
-  activeZone.siteId = row.siteId || cctvStore.sites[0]?.id || 'SIT-001'
+  activeZone.siteId = row.siteId || ''
   activeZone.name = row.name
   activeZone.description = row.description || ''
   zoneModalOpen.value = true
@@ -699,7 +678,7 @@ async function saveZone() {
     return
   }
   if (!activeZone.siteId) {
-    toast.error('Form Belum Lengkap', 'Site induk wajib dipilih.')
+    toast.error('Form Belum Lengkap', 'Silakan pilih site terlebih dahulu.')
     return
   }
 

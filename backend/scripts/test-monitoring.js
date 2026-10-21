@@ -215,8 +215,10 @@ async function runTests() {
       });
 
       if (targetCam) {
-        // Simpan status awal
+        // Simpan status awal dan pastikan mulai dari UNKNOWN untuk mendeteksi perubahan transisi
         const initialStatus = targetCam.status;
+        await prisma.camera.update({ where: { id: targetCam.id }, data: { status: "UNKNOWN" } });
+        targetCam.status = "UNKNOWN";
 
         // 5.1 Uji Ping Sukses -> Transisi ke ONLINE
         const checkResult1 = await monitoringService.checkDevice({

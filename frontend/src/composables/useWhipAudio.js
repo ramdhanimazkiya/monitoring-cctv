@@ -1,7 +1,7 @@
 import { ref, onUnmounted } from 'vue'
 
 export function useWhipAudio() {
-  const defaultWhipUrl = 'https://stream.zakuyu.fun/audio-raw/whip'
+  const defaultWhipUrl = ''
   const whipUrl = ref(defaultWhipUrl)
 
   // Enforced Audio Quality Specification (16 kHz Sample Rate, Mono 1 Channel)
@@ -141,10 +141,16 @@ export function useWhipAudio() {
    * Start WHIP Publishing (Microphone 16kHz Mono -> MediaMTX)
    */
   async function startPublish(customWhipUrl) {
-    if (isPublishing.value) return
+    if (isPublishing.value) return false
 
     if (customWhipUrl) {
       whipUrl.value = customWhipUrl
+    }
+
+    if (!whipUrl.value || !whipUrl.value.trim()) {
+      publishError.value = 'URL WHIP belum dikonfigurasi.'
+      publishState.value = 'error'
+      return false
     }
 
     publishError.value = ''

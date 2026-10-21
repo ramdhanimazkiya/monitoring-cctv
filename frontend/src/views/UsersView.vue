@@ -26,7 +26,7 @@
     </div>
 
     <!-- Metric Summary Cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
       <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between">
         <div>
           <span class="text-[10px] text-slate-400 uppercase block">Total Pengguna:</span>
@@ -56,16 +56,6 @@
           <UserCheck class="w-4 h-4" />
         </div>
       </div>
-
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block">Akun Aktif:</span>
-          <p class="text-xl font-bold text-emerald-400">{{ totalActiveUsers }}</p>
-        </div>
-        <div class="w-8 h-8 rounded-lg bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-          <CheckCircle2 class="w-4 h-4" />
-        </div>
-      </div>
     </div>
 
     <!-- Filter & Search Controls -->
@@ -79,17 +69,6 @@
           <option value="ALL" class="bg-[#111827] text-slate-200">Semua Peran (Role)</option>
           <option value="ADMIN" class="bg-[#111827] text-slate-200">Administrator</option>
           <option value="OPERATOR" class="bg-[#111827] text-slate-200">Operator</option>
-        </select>
-
-        <div class="w-px h-6 bg-[#283548]"></div>
-
-        <select
-          v-model="selectedStatusFilter"
-          class="bg-transparent text-slate-200 text-xs focus:outline-none cursor-pointer"
-        >
-          <option value="ALL" class="bg-[#111827] text-slate-200">Semua Status</option>
-          <option value="ACTIVE" class="bg-[#111827] text-slate-200">Aktif</option>
-          <option value="INACTIVE" class="bg-[#111827] text-slate-200">Nonaktif</option>
         </select>
 
         <div class="w-px h-6 bg-[#283548]"></div>
@@ -164,16 +143,6 @@
           <UserCheck v-else class="w-3 h-3 text-indigo-400" />
           {{ row.role }}
         </span>
-      </template>
-
-
-      <!-- Slot Status Akun -->
-      <template #status="{ row }">
-        <Badge
-          :status="row.isActive ? 'ACTIVE' : 'INACTIVE'"
-          :label="row.isActive ? 'AKTIF' : 'NONAKTIF'"
-          size="xs"
-        />
       </template>
 
       <!-- Slot Aksi -->
@@ -338,19 +307,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Status Akun -->
-        <div class="flex items-center gap-2 pt-1">
-          <input
-            id="user-active-checkbox"
-            v-model="activeUser.isActive"
-            type="checkbox"
-            class="w-4 h-4 rounded bg-[#111827] border-[#283548] text-blue-500 focus:ring-0 cursor-pointer"
-          />
-          <label for="user-active-checkbox" class="text-xs font-medium text-slate-200 cursor-pointer">
-            Akun Aktif (Dapat Login ke Portal)
-          </label>
-        </div>
       </div>
 
       <template #footer="{ close }">
@@ -374,11 +330,11 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { Table, Badge, Button, Modal, ConfirmationDialog } from '../components/ui/index.js'
+import { Table, Button, Modal, ConfirmationDialog } from '../components/ui/index.js'
 import { useUsersStore } from '../stores/users.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useToast } from '../composables/useToast.js'
-import { Users, ShieldCheck, UserCheck, CheckCircle2, Filter, Eye, EyeOff } from '@lucide/vue'
+import { Users, ShieldCheck, UserCheck, Filter, Eye, EyeOff } from '@lucide/vue'
 
 const toast = useToast()
 const usersStore = useUsersStore()
@@ -388,23 +344,20 @@ const authStore = useAuthStore()
 // FILTER & PAGINATION STATE
 // -----------------------------------------------------------------------------
 const selectedRoleFilter = ref('ALL')
-const selectedStatusFilter = ref('ALL')
 const searchQuery = ref('')
 const pageSize = 5
 const currentPage = ref(1)
 
 const columns = [
-  { key: 'id', label: 'ID (Auto)', width: 'w-28' },
+  { key: 'id', label: 'ID speaker', width: 'w-28' },
   { key: 'user', label: 'Username' },
   { key: 'fullName', label: 'Nama Lengkap' },
   { key: 'role', label: 'Peran (Role)', width: 'w-32' },
-  { key: 'status', label: 'Status Akun', width: 'w-28' },
   { key: 'actions', label: 'Aksi', align: 'right', width: 'w-28' }
 ]
 
 const totalAdmins = computed(() => usersStore.users.filter((u) => u.role === 'ADMIN').length)
 const totalOperators = computed(() => usersStore.users.filter((u) => u.role === 'OPERATOR').length)
-const totalActiveUsers = computed(() => usersStore.users.filter((u) => u.isActive).length)
 
 const filteredUsers = computed(() => {
   return usersStore.users.filter((u) => {
@@ -412,9 +365,6 @@ const filteredUsers = computed(() => {
     if (selectedRoleFilter.value !== 'ALL' && u.role !== selectedRoleFilter.value) {
       return false
     }
-    // Status Filter
-    if (selectedStatusFilter.value === 'ACTIVE' && !u.isActive) return false
-    if (selectedStatusFilter.value === 'INACTIVE' && u.isActive) return false
 
     // Search Query
     if (searchQuery.value.trim()) {

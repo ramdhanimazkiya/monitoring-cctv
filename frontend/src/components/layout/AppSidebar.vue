@@ -144,7 +144,6 @@ import {
   LayoutDashboard,
   Video,
   Megaphone,
-  CalendarClock,
   BellRing,
   FileBarChart,
   Server,
@@ -172,7 +171,6 @@ const operatorNav = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { label: 'CCTV Monitoring', path: '/cctv', icon: Video, badge: 'GRID & MAP' },
   { label: 'Audio Paging', path: '/audio-paging', icon: Megaphone },
-  { label: 'Audio Scheduler', path: '/audio-scheduler', icon: CalendarClock },
   { label: 'Event & Alarm', path: '/events', icon: BellRing },
   { label: 'Reports', path: '/reports', icon: FileBarChart },
 ]

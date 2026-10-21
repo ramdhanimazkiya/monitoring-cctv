@@ -182,12 +182,31 @@ export async function listZones(siteId = null) {
 }
 
 export async function createZone(data, userId, req) {
+  // Pastikan ada siteId yang valid jika tidak dikirim dari form input
+  let siteId = data.siteId;
+  if (!siteId) {
+    let defaultSite = await prisma.site.findFirst({
+      where: { deletedAt: null },
+      orderBy: { id: "asc" },
+    });
+    if (!defaultSite) {
+      defaultSite = await prisma.site.create({
+        data: {
+          id: "SIT-001",
+          name: "Site Utama",
+          description: "Site otomatis sistem",
+        },
+      });
+    }
+    siteId = defaultSite.id;
+  }
+
   // Cek keunikan nama dalam site
   const duplicate = await prisma.zone.findFirst({
-    where: { siteId: data.siteId, name: data.name, deletedAt: null },
+    where: { siteId, name: data.name, deletedAt: null },
   });
   if (duplicate) {
-    throw new ConflictError(`Zona bernama '${data.name}' sudah ada di site ${data.siteId}`);
+    throw new ConflictError(`Zona bernama '${data.name}' sudah ada di site ${siteId}`);
   }
 
   // Generate ID dengan format ZON-001 (3 digit+) seperti SIT-001
@@ -205,6 +224,7 @@ export async function createZone(data, userId, req) {
   const created = await prisma.zone.create({
     data: {
       ...data,
+      siteId,
       id: zoneId,
     },
   });
@@ -223,9 +243,10 @@ export async function updateZone(id, data, userId, req) {
   const existing = await prisma.zone.findFirst({ where: { id, deletedAt: null } });
   if (!existing) throw new NotFoundError(`Zona dengan ID ${id} tidak ditemukan`);
 
+  const targetSiteId = data.siteId || existing.siteId;
   if (data.name && data.name !== existing.name) {
     const duplicate = await prisma.zone.findFirst({
-      where: { siteId: existing.siteId, name: data.name, deletedAt: null },
+      where: { siteId: targetSiteId, name: data.name, deletedAt: null, NOT: { id } },
     });
     if (duplicate) {
       throw new ConflictError(`Zona bernama '${data.name}' sudah ada di site tersebut`);

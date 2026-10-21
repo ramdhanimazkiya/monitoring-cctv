@@ -3,61 +3,13 @@ import { ref, computed } from 'vue'
 
 const STORAGE_KEY = 'cctv_audio_speakers_v1'
 
-const INITIAL_SPEAKERS = [
-  {
-    id: 'AUD-0001',
-    name: 'Speaker Lobby Utama',
-    siteId: 'SIT-0001',
-    zoneId: 'ZON-0001',
-    zoneName: 'Lobby Utama',
-    whipUrl: 'https://stream.zakuyu.fun/audio-raw/whip',
-    latitude: -6.917464,
-    longitude: 107.619122,
-    sampleRate: 16000,
-    channels: 1, // Mono
-    volume: 85,
-    status: 'ONLINE',
-    latencyMs: 24,
-    lastPingAt: 'Baru saja',
-    isActive: true
-  },
-  {
-    id: 'AUD-0002',
-    name: 'Speaker Area Parkir',
-    siteId: 'SIT-0001',
-    zoneId: 'ZON-0002',
-    zoneName: 'Area Parkir Timur',
-    whipUrl: 'https://stream.zakuyu.fun/audio-raw/whip',
-    latitude: -6.918100,
-    longitude: 107.619800,
-    sampleRate: 16000,
-    channels: 1, // Mono
-    volume: 90,
-    status: 'ONLINE',
-    latencyMs: 38,
-    lastPingAt: 'Baru saja',
-    isActive: true
-  },
-  {
-    id: 'AUD-0003',
-    name: 'Speaker Koridor Barat',
-    siteId: 'SIT-0001',
-    zoneId: 'ZON-0001',
-    zoneName: 'Lobby Utama',
-    whipUrl: 'https://stream.zakuyu.fun/audio-raw/whip',
-    latitude: -6.916800,
-    longitude: 107.618500,
-    sampleRate: 16000,
-    channels: 1, // Mono
-    volume: 75,
-    status: 'ONLINE',
-    latencyMs: 19,
-    lastPingAt: 'Baru saja',
-    isActive: true
-  }
-]
+const INITIAL_SPEAKERS = []
 
 export const useAudioDevicesStore = defineStore('audioDevices', () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(STORAGE_KEY)
+  }
+
   // Load from localStorage or defaults
   const devices = ref(loadFromStorage())
 
@@ -69,6 +21,7 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map(d => ({
             ...d,
+            status: d.status || 'UNKNOWN',
             latitude: d.latitude !== undefined ? d.latitude : (d.id === 'AUD-0001' ? -6.917464 : d.id === 'AUD-0002' ? -6.918100 : -6.916800),
             longitude: d.longitude !== undefined ? d.longitude : (d.id === 'AUD-0001' ? 107.619122 : d.id === 'AUD-0002' ? 107.619800 : 107.618500)
           }))
@@ -119,18 +72,18 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
     const newDevice = {
       id: nextId, // Immutable generated ID
       name: payload.name.trim(),
-      siteId: payload.siteId || 'SIT-0001',
-      zoneId: payload.zoneId || 'ZON-0001',
-      zoneName: payload.zoneName || (payload.zoneId === 'ZON-0002' ? 'Area Parkir Timur' : 'Lobby Utama'),
-      whipUrl: payload.whipUrl?.trim() || 'https://stream.zakuyu.fun/audio-raw/whip',
+      siteId: payload.siteId || null,
+      zoneId: payload.zoneId || null,
+      zoneName: payload.zoneName || '-',
+      whipUrl: payload.whipUrl?.trim() || '',
       latitude: payload.latitude !== null && payload.latitude !== undefined && payload.latitude !== '' ? Number(payload.latitude) : null,
       longitude: payload.longitude !== null && payload.longitude !== undefined && payload.longitude !== '' ? Number(payload.longitude) : null,
       sampleRate: 16000, // Enforce 16kHz
       channels: 1, // Enforce Mono
       volume: payload.volume !== undefined ? Number(payload.volume) : 80,
-      status: 'ONLINE',
-      latencyMs: 22,
-      lastPingAt: 'Baru saja',
+      status: 'UNKNOWN',
+      latencyMs: null,
+      lastPingAt: '-',
       isActive: true,
       createdAt: new Date().toISOString()
     }
@@ -153,7 +106,7 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
       name: payload.name ? payload.name.trim() : current.name,
       siteId: payload.siteId || current.siteId,
       zoneId: payload.zoneId || current.zoneId,
-      zoneName: payload.zoneName || (payload.zoneId === 'ZON-0002' ? 'Area Parkir Timur' : 'Lobby Utama'),
+      zoneName: payload.zoneName || current.zoneName || '-',
       whipUrl: payload.whipUrl ? payload.whipUrl.trim() : current.whipUrl,
       latitude: payload.latitude !== undefined ? (payload.latitude !== null && payload.latitude !== '' ? Number(payload.latitude) : null) : current.latitude,
       longitude: payload.longitude !== undefined ? (payload.longitude !== null && payload.longitude !== '' ? Number(payload.longitude) : null) : current.longitude,
@@ -190,7 +143,15 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
     const dev = getDeviceById(id)
     if (!dev) return { success: false, error: 'Perangkat tidak ditemukan' }
 
-    const url = dev.whipUrl || 'https://stream.zakuyu.fun/audio-raw/whip'
+    if (!dev.whipUrl || !dev.whipUrl.trim()) {
+      dev.status = 'OFFLINE'
+      dev.latencyMs = null
+      dev.lastPingAt = new Date().toLocaleTimeString('id-ID')
+      saveToStorage()
+      return { success: false, error: 'URL WHIP belum dikonfigurasi' }
+    }
+
+    const url = dev.whipUrl.trim()
     const start = performance.now()
 
     try {
@@ -228,9 +189,16 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
    * SET DYNAMIC TRANSMISSION STATUS (ON AIR vs ONLINE)
    */
   function setTransmissionStatus(id, isTransmitting) {
+    const revertStatus = (d) => {
+      if (isTransmitting) return 'ON AIR'
+      if (d.lastPingAt && d.lastPingAt !== '-' && d.lastPingAt !== 'Koneksi Gagal') return 'ONLINE'
+      if (d.status === 'OFFLINE' || d.lastPingAt === 'Koneksi Gagal') return 'OFFLINE'
+      return d.status || 'UNKNOWN'
+    }
+
     if (id === 'ALL') {
       devices.value.forEach(d => {
-        if (d.isActive) d.status = isTransmitting ? 'ON AIR' : 'ONLINE'
+        if (d.isActive) d.status = revertStatus(d)
       })
       saveToStorage()
       return
@@ -239,7 +207,7 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
     if (id.startsWith('ZON-')) {
       devices.value.forEach(d => {
         if (d.zoneId === id && d.isActive) {
-          d.status = isTransmitting ? 'ON AIR' : 'ONLINE'
+          d.status = revertStatus(d)
         }
       })
       saveToStorage()
@@ -248,7 +216,7 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
 
     const dev = getDeviceById(id)
     if (dev) {
-      dev.status = isTransmitting ? 'ON AIR' : 'ONLINE'
+      dev.status = revertStatus(dev)
       saveToStorage()
     }
   }
