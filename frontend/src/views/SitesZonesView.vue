@@ -5,12 +5,12 @@
       <div>
         <div class="flex items-center gap-2 flex-wrap">
           <h2 class="text-lg font-bold text-slate-100 tracking-tight">Site & Zone Management</h2>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/70 text-amber-300 border border-amber-800">
+          <!-- <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/70 text-amber-300 border border-amber-800">
             ADMINISTRASI
-          </span>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-950/70 text-blue-300 border border-blue-800">
+          </span> -->
+          <!-- <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-950/70 text-blue-300 border border-blue-800">
             DATABASE POSTGRESQL
-          </span>
+          </span> -->
         </div>
         <p class="text-xs text-slate-400 mt-1 font-mono">
           Hierarki lokasi dua tingkat: Site (gedung/fasilitas) dan Zone (area pemantauan & audio). ID Zona terhubung otomatis dengan ID Site (ZON-001).
@@ -480,7 +480,9 @@
       v-model="deleteConfirmOpen"
       :title="deleteType === 'ZONE' ? 'Konfirmasi Hapus Zona' : 'Konfirmasi Hapus Site'"
       :message="`Apakah Anda yakin ingin menghapus ${deleteType === 'ZONE' ? 'Zona' : 'Site'} ${toDeleteTarget?.id} - ${toDeleteTarget?.name}?`"
-      warning="Data master akan diarsipkan (soft delete). Catatan histori audit log akan tetap terjaga."
+      :warning="deleteType === 'ZONE'
+        ? 'Opsi A Terpasang: Seluruh CCTV dan audio di zona ini TIDAK akan hilang, melainkan dialihkan ke status Tanpa Zona (Unassigned) di Site terkait agar pemantauan keamanan tetap aktif.'
+        : 'Data master akan diarsipkan (soft delete). Catatan histori audit log akan tetap terjaga.'"
       @confirm="confirmDelete"
     />
   </div>

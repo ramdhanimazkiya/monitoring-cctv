@@ -83,21 +83,80 @@
           <span class="text-[9px] text-amber-400 font-mono">ADMIN</span>
         </div>
         <nav class="space-y-0.5">
-          <router-link
-            v-for="item in adminNav"
-            :key="item.path"
-            :to="item.path"
-            :class="[
-              'flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium transition-all group',
-              isActive(item.path)
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold'
-                : 'text-slate-300 hover:bg-[#151f33] hover:text-white'
-            ]"
-            :title="collapsed ? item.label : ''"
-          >
-            <component :is="item.icon" class="w-4 h-4 shrink-0 transition-transform group-hover:scale-105" />
-            <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
-          </router-link>
+          <template v-for="item in adminNav" :key="item.path">
+            <!-- Non-child item -->
+            <router-link
+              v-if="!item.children"
+              :to="item.path"
+              :class="[
+                'flex items-center gap-3 px-2.5 py-2 rounded-md text-xs font-medium transition-all group',
+                isActive(item.path)
+                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold'
+                  : 'text-slate-300 hover:bg-[#151f33] hover:text-white'
+              ]"
+              :title="collapsed ? item.label : ''"
+            >
+              <component :is="item.icon" class="w-4 h-4 shrink-0 transition-transform group-hover:scale-105" />
+              <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+            </router-link>
+
+            <!-- Parent item with children (Soft Delete) -->
+            <div v-else class="space-y-0.5">
+              <div
+                :class="[
+                  'flex items-center justify-between px-2.5 py-2 rounded-md text-xs font-medium transition-all group cursor-pointer select-none',
+                  isSoftDeleteActive
+                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold'
+                    : 'text-slate-300 hover:bg-[#151f33] hover:text-white'
+                ]"
+                :title="collapsed ? item.label : ''"
+                @click="toggleSoftDeleteExpand"
+              >
+                <div class="flex items-center gap-3 min-w-0">
+                  <component :is="item.icon" class="w-4 h-4 shrink-0 transition-transform group-hover:scale-105" />
+                  <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+                </div>
+                <div v-if="!collapsed" class="flex items-center gap-1.5">
+                  <span
+                    v-if="trashStore.summary.totalCount > 0"
+                    class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-800"
+                  >
+                    {{ trashStore.summary.totalCount }}
+                  </span>
+                  <component :is="softDeleteExpanded ? ChevronDown : ChevronRight" class="w-3.5 h-3.5 text-slate-400" />
+                </div>
+              </div>
+
+              <!-- Children list (Indented) -->
+              <div
+                v-if="!collapsed && softDeleteExpanded"
+                class="pl-4 ml-3 border-l border-amber-500/30 space-y-0.5 py-1 transition-all"
+              >
+                <router-link
+                  v-for="sub in item.children"
+                  :key="sub.path"
+                  :to="sub.path"
+                  :class="[
+                    'flex items-center justify-between px-2 py-1.5 rounded-md text-[11px] font-medium transition-all group font-mono',
+                    route.path === sub.path
+                      ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
+                      : 'text-slate-400 hover:bg-[#151f33] hover:text-slate-100'
+                  ]"
+                >
+                  <div class="flex items-center gap-2 truncate">
+                    <component :is="sub.icon" class="w-3.5 h-3.5 shrink-0 opacity-80" />
+                    <span class="truncate">{{ sub.label }}</span>
+                  </div>
+                  <span
+                    v-if="sub.badge && sub.badge() > 0"
+                    class="ml-auto text-[9px] font-mono px-1 rounded bg-[#101726] text-amber-400 border border-amber-800/60"
+                  >
+                    {{ sub.badge() }}
+                  </span>
+                </router-link>
+              </div>
+            </div>
+          </template>
         </nav>
       </div>
     </div>
@@ -138,8 +197,10 @@
 </template>
 
 <script setup>
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
+import { useTrashStore } from '../../stores/trash.js'
 import {
   LayoutDashboard,
   Video,
@@ -152,10 +213,12 @@ import {
   ClipboardList,
   ChevronLeft,
   ChevronRight,
-  Radio
+  ChevronDown,
+  Radio,
+  ArchiveRestore
 } from '@lucide/vue'
 
-defineProps({
+const props = defineProps({
   collapsed: {
     type: Boolean,
     default: false
@@ -165,7 +228,29 @@ defineProps({
 defineEmits(['toggle-collapse'])
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
+const trashStore = useTrashStore()
+
+const softDeleteExpanded = ref(true)
+const isSoftDeleteActive = computed(() => route.path.startsWith('/soft-delete'))
+
+function toggleSoftDeleteExpand() {
+  if (props.collapsed) {
+    router.push('/soft-delete/devices')
+  } else {
+    softDeleteExpanded.value = !softDeleteExpanded.value
+    if (!isSoftDeleteActive.value) {
+      router.push('/soft-delete/devices')
+    }
+  }
+}
+
+onMounted(() => {
+  if (authStore.isAdmin) {
+    trashStore.fetchSummary()
+  }
+})
 
 const operatorNav = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -179,6 +264,31 @@ const adminNav = [
   { label: 'Device Management', path: '/devices', icon: Server },
   { label: 'Site & Zone', path: '/sites-zones', icon: MapPin },
   { label: 'User Management', path: '/users', icon: Users },
+  {
+    label: 'Soft Delete',
+    path: '/soft-delete',
+    icon: ArchiveRestore,
+    children: [
+      {
+        label: 'Device Management',
+        path: '/soft-delete/devices',
+        icon: Server,
+        badge: () => trashStore.summary.devicesCount
+      },
+      {
+        label: 'Site & Zone',
+        path: '/soft-delete/sites-zones',
+        icon: MapPin,
+        badge: () => trashStore.summary.sitesZonesCount
+      },
+      {
+        label: 'User Management',
+        path: '/soft-delete/users',
+        icon: Users,
+        badge: () => trashStore.summary.usersCount
+      }
+    ]
+  },
   { label: 'Audit Log', path: '/audit-logs', icon: ClipboardList },
 ]
 

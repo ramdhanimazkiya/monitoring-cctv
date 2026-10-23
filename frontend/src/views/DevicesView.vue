@@ -3,8 +3,8 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#283548]">
       <div>
         <div class="flex items-center gap-2">
-          <h2 class="text-lg font-bold text-slate-100 tracking-tight">Manajemen Perangkat (Admin)</h2>
-          <Badge status="ACTIVE" label="ADMIN ONLY" size="xs" />
+          <h2 class="text-lg font-bold text-slate-100 tracking-tight">Manajemen Perangkat</h2>
+          <!-- <Badge status="ACTIVE" label="ADMIN ONLY" size="xs" /> -->
         </div>
         <p class="text-xs text-slate-400 mt-0.5 font-mono">
           Inventaris kamera CCTV & speaker audio paging WHIP. <strong>ID perangkat (CAM-xxxx / AUD-xxxx) di-generate otomatis dan immutable.</strong>
@@ -934,11 +934,15 @@ function saveSpeaker() {
 
   speakerModalOpen.value = false
 
+  const matchedZone = cctvStore.zones.find(z => z.id === activeSpeaker.zoneId)
+  const zoneName = matchedZone?.name || '-'
+
   if (modalMode.value === 'create') {
     const created = audioStore.createDevice({
       name: activeSpeaker.name,
       siteId: activeSpeaker.siteId,
       zoneId: activeSpeaker.zoneId,
+      zoneName: zoneName,
       whipUrl: activeSpeaker.whipUrl,
       latitude: activeSpeaker.latitude !== null && activeSpeaker.latitude !== '' ? Number(activeSpeaker.latitude) : null,
       longitude: activeSpeaker.longitude !== null && activeSpeaker.longitude !== '' ? Number(activeSpeaker.longitude) : null,
@@ -950,6 +954,7 @@ function saveSpeaker() {
       name: activeSpeaker.name,
       siteId: activeSpeaker.siteId,
       zoneId: activeSpeaker.zoneId,
+      zoneName: zoneName,
       whipUrl: activeSpeaker.whipUrl,
       latitude: activeSpeaker.latitude !== null && activeSpeaker.latitude !== '' ? Number(activeSpeaker.latitude) : null,
       longitude: activeSpeaker.longitude !== null && activeSpeaker.longitude !== '' ? Number(activeSpeaker.longitude) : null,

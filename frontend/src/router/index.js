@@ -15,6 +15,7 @@ import SitesZonesView from '../views/SitesZonesView.vue'
 import UsersView from '../views/UsersView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import AuditLogsView from '../views/AuditLogsView.vue'
+import SoftDeleteView from '../views/SoftDeleteView.vue'
 
 const routes = [
   {
@@ -93,6 +94,16 @@ const routes = [
         name: 'users',
         component: UsersView,
         meta: { title: 'User Management', requiresAdmin: true }
+      },
+      {
+        path: 'soft-delete',
+        redirect: '/soft-delete/devices'
+      },
+      {
+        path: 'soft-delete/:sub(devices|sites-zones|users)',
+        name: 'soft-delete',
+        component: SoftDeleteView,
+        meta: { title: 'Data Terhapus (Soft Delete)', requiresAdmin: true }
       },
       {
         path: 'settings',

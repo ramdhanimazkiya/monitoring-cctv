@@ -113,13 +113,13 @@
           title="Peta Lokasi Perangkat "
           subtitle="Pemantauan live streaming CCTV terintegrasi dengan pemetaan geospasial Leaflet OpenStreetMap."
         >
-          <template #actions>
+          <!-- <template #actions>
             <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/70 border border-emerald-800 text-emerald-300">
               Leaflet Engine
             </span>
-          </template>
+          </template> -->
           <div class="h-80 w-full">
-            <DeviceMap :devices="displayedMapDevices" />
+            <DeviceMap :devices="displayedMapDevices" navigate-on-select />
           </div>
           <template #footer>
             <div class="flex items-center justify-between w-full text-[11px] font-mono text-slate-400">
@@ -229,80 +229,95 @@
           </template>
         </Card>
 
-        <!-- Audio Paging Console (Minimalist Sidebar-Matched Design) -->
-        <div class="p-4 rounded-xl bg-[#0d121d] border border-[#283548] shadow-md space-y-3">
+        <!-- Emergency Audio Paging (Locks 100% Registered Speakers, Minimal & Non-Intrusive) -->
+        <div class="p-3.5 rounded-xl bg-gradient-to-br from-[#120f18] via-[#0d121d] to-[#0a0f1a] border border-rose-900/50 shadow-md space-y-3 relative overflow-hidden border-t-2 border-t-rose-500/70">
+          <!-- Ambient glowing background effect -->
+          <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-rose-600/5 rounded-full blur-2xl pointer-events-none"></div>
+
           <!-- Header Bar -->
-          <div class="flex items-center justify-between pb-2 border-b border-[#1e293b]">
+          <div class="flex items-center justify-between pb-2 border-b border-[#241a28]">
             <div class="flex items-center gap-2">
-              <div class="w-7 h-7 rounded-lg bg-blue-600/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                <Volume2 class="w-4 h-4" />
+              <div class="w-7 h-7 rounded-lg bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                <Siren :class="['w-4 h-4', isPagingTransmitting ? 'animate-bounce text-rose-300' : 'animate-pulse text-rose-400']" />
               </div>
               <div>
-                <h4 class="text-xs font-bold text-slate-100 font-mono tracking-tight">
-                  Audio Paging Console
-                </h4>
-                <p class="text-[11px] text-slate-400">
-                  Push-to-Talk mikrofon (16 kHz Mono)
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h4 class="text-xs font-bold text-slate-100 font-mono tracking-tight">
+                    Emergency Audio Paging
+                  </h4>
+                  <span
+                    v-if="isPagingTransmitting"
+                    class="text-[9px] px-1.5 py-0.2 rounded bg-rose-500/25 text-rose-300 border border-rose-500/40 font-bold flex items-center gap-1 animate-pulse"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping"></span>
+                    ON AIR: {{ pagingDuration }}
+                  </span>
+                </div>
+                <p class="text-[10px] text-slate-400 font-mono">
+                  Transmisi darurat serentak ke seluruh speaker
                 </p>
               </div>
             </div>
 
-            <!-- Dynamic Status Badge -->
-            <span
-              v-if="isPagingTransmitting"
-              class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-950/90 text-rose-300 border border-rose-600 shadow-xs animate-pulse"
-            >
-              <span class="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping"></span>
-              ON AIR: {{ pagingDuration }}
+            <!-- Right: Auto-Ping status + Link to full console -->
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-mono text-slate-400 flex items-center gap-1" title="Ping otomatis tiap 10 detik">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>{{ avgAudioLatency !== null ? `${avgAudioLatency}ms` : '10s' }}</span>
+              </span>
+              <router-link
+                to="/audio"
+                class="text-[10px] font-mono text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-0.5"
+                title="Buka Konsol Audio Paging Penuh (Pilih Per Zona)"
+              >
+                <span>Pilih Zona</span>
+                <span>→</span>
+              </router-link>
+            </div>
+          </div>
+
+          <!-- Emergency Lock Status Banner -->
+          <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#180f1a] border border-rose-900/40 text-xs font-mono">
+            <div class="flex items-center gap-2 text-rose-300">
+              <Lock class="w-3.5 h-3.5 text-rose-400 shrink-0 animate-pulse" />
+              <div class="text-[11px]">
+                <strong class="text-rose-200">Seluruh {{ totalPagingActive }} Speaker Terkunci</strong>
+                <span class="text-[10px] text-rose-400/80 block sm:inline sm:ml-1 font-normal">(100% Emergency Lock)</span>
+              </div>
+            </div>
+
+            <span class="text-[10px] font-mono text-slate-400 shrink-0">
+              16 kHz Mono
             </span>
           </div>
 
-          <!-- Selection & PTT Trigger Row -->
-          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-            <div class="sm:col-span-7">
-              <label class="block text-[10px] font-mono text-slate-400 mb-1 uppercase">
-                Pilih Target Speaker / Zona:
-              </label>
-              <select
-                v-model="pagingTarget"
-                :disabled="isPagingTransmitting"
-                class="w-full bg-[#111827] border border-[#283548] rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer disabled:opacity-60"
-              >
-                <option v-for="opt in pagingTargetOptions" :key="opt.value" :value="opt.value">
-                  {{ opt.label }}
-                </option>
-              </select>
-            </div>
-
-            <div class="sm:col-span-5 flex items-end">
-              <button
-                type="button"
-                :disabled="whipAudio.publishState.value === 'connecting' || whipAudio.publishState.value === 'requesting_mic'"
-                :class="[
-                  'w-full py-1.5 px-3 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all select-none shadow-md cursor-pointer active:scale-95',
-                  isPagingTransmitting
-                    ? 'bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-glow-offline animate-pulse ring-2 ring-rose-400/60'
-                    : whipAudio.publishState.value === 'connecting'
-                    ? 'bg-amber-600 text-white border border-amber-400 animate-pulse'
-                    : 'bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/60 shadow-glow-online hover:scale-[1.01]'
-                ]"
-                @click="toggleAudioPaging"
-              >
-                <Radio v-if="isPagingTransmitting" class="w-3.5 h-3.5 animate-bounce" />
-                <Activity v-else-if="whipAudio.publishState.value === 'connecting'" class="w-3.5 h-3.5 animate-spin" />
-                <Mic v-else class="w-3.5 h-3.5" />
-                <span>
-                  {{
-                    isPagingTransmitting
-                      ? 'Selesai Bicara'
-                      : whipAudio.publishState.value === 'connecting'
-                      ? 'Menghubungkan...'
-                      : 'Mulai Siaran'
-                  }}
-                </span>
-              </button>
-            </div>
-          </div>
+          <!-- Emergency Trigger Button -->
+          <button
+            type="button"
+            :disabled="whipAudio.publishState.value === 'connecting' || whipAudio.publishState.value === 'requesting_mic'"
+            :class="[
+              'w-full py-2 px-3 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all select-none shadow-md cursor-pointer active:scale-98',
+              isPagingTransmitting
+                ? 'bg-rose-600 hover:bg-rose-500 text-white border-2 border-rose-300 shadow-glow-offline animate-pulse ring-4 ring-rose-500/40'
+                : whipAudio.publishState.value === 'connecting'
+                ? 'bg-amber-600 text-white border border-amber-400 animate-pulse'
+                : 'bg-gradient-to-r from-rose-700 via-rose-600 to-red-600 hover:from-rose-600 hover:to-red-500 text-white border border-rose-400/60 shadow-lg shadow-rose-950/40 hover:shadow-rose-900/60'
+            ]"
+            @click="toggleEmergencyPaging"
+          >
+            <Radio v-if="isPagingTransmitting" class="w-4 h-4 animate-bounce" />
+            <Activity v-else-if="whipAudio.publishState.value === 'connecting'" class="w-4 h-4 animate-spin" />
+            <Siren v-else class="w-4 h-4 text-rose-200" />
+            <span>
+              {{
+                isPagingTransmitting
+                  ? 'ON AIR — HENTIKAN SIARAN DARURAT'
+                  : whipAudio.publishState.value === 'connecting'
+                  ? `Menghubungkan ${totalPagingActive} Speaker...`
+                  : 'SIARAN DARURAT (PTT LOCK ALL)'
+              }}
+            </span>
+          </button>
         </div>
       </div>
     </div>
@@ -524,7 +539,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import {
   Button,
   Card,
@@ -546,7 +561,14 @@ import {
   CheckCircle2,
   Radio,
   Mic,
-  Activity
+  Activity,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+  Lock,
+  Siren
 } from '@lucide/vue'
 
 import { useCctvStore } from '../stores/cctv.js'
@@ -562,9 +584,13 @@ const eventsStore = useEventsStore()
 const loading = ref(false)
 const deviceFilter = ref('ALL') // 'ALL' | 'CCTV' | 'AUDIO'
 
-// Audio Paging Console State (Minimalist)
-const pagingTarget = ref('ALL')
+// Emergency Audio Paging State (Dashboard locks 100% registered speakers)
+const avgAudioLatency = ref(null)
+let dashboardPingTimer = null
+
 const isPagingTransmitting = computed(() => whipAudio.isPublishing.value)
+
+const totalPagingActive = computed(() => audioStore.activeDevices.length)
 
 const pagingDuration = computed(() => {
   const sec = whipAudio.durationSeconds.value
@@ -573,65 +599,65 @@ const pagingDuration = computed(() => {
   return `${mins}:${secs}`
 })
 
-const pagingTargetOptions = computed(() => {
-  const options = [
-    { value: 'ALL', label: '📢 Semua Speaker (Broadcast Global)' }
-  ]
+// Auto-ping execution (every 10 seconds for all registered speakers)
+async function executeDashboardAudioPing({ silent = true } = {}) {
+  if (isPagingTransmitting.value) return
+  const targets = audioStore.activeDevices
+  if (targets.length === 0) return
 
-  // Dynamic Zones from CCTV Store
-  if (cctvStore.zones && cctvStore.zones.length > 0) {
-    cctvStore.zones.forEach((z) => {
-      options.push({
-        value: `ZONE_${z.id || z.code || z.name}`,
-        label: `🏢 Zona: ${z.name || z.id}`
-      })
+  try {
+    const results = await Promise.all(
+      targets.map(spk => audioStore.pingDevice(spk.id))
+    )
+    let sum = 0
+    let count = 0
+    results.forEach(res => {
+      if (res && res.success && typeof res.latency === 'number') {
+        sum += res.latency
+        count++
+      }
     })
+    if (count > 0) {
+      avgAudioLatency.value = Math.round(sum / count)
+      if (!silent) {
+        toast.success('Ping Audio', `Rata-rata latensi: ${avgAudioLatency.value}ms`)
+      }
+    }
+  } catch (err) {
+    if (!silent) toast.error('Ping Gagal', err.message)
   }
+}
 
-  // Active Individual Speakers
-  audioStore.activeDevices.forEach((d) => {
-    options.push({
-      value: d.id,
-      label: `🔊 ${d.name} (${d.status || 'UNKNOWN'})`
-    })
-  })
+// Emergency PTT Broadcast: Automatically locks and publishes to ALL registered speakers
+async function toggleEmergencyPaging() {
+  const allSpeakers = audioStore.activeDevices
 
-  return options
-})
-
-async function toggleAudioPaging() {
   if (isPagingTransmitting.value) {
     await whipAudio.stopPublish()
-    toast.info('Siaran Selesai', 'Siaran audio paging telah dihentikan.')
+    allSpeakers.forEach(s => audioStore.setTransmissionStatus(s.id, false))
+    toast.info('Siaran Darurat Selesai', 'Siaran audio darurat telah dihentikan.')
     return
   }
 
-  const targetOpt = pagingTargetOptions.value.find((opt) => opt.value === pagingTarget.value)
-  const targetLabel = targetOpt ? targetOpt.label : pagingTarget.value
-
-  let targetUrl = ''
-  if (pagingTarget.value.startsWith('AUD-')) {
-    const spk = audioStore.getDeviceById(pagingTarget.value)
-    if (spk?.whipUrl) {
-      targetUrl = spk.whipUrl.trim()
-    }
-  } else if (audioStore.activeDevices.length > 0) {
-    const firstWithUrl = audioStore.activeDevices.find(a => a.whipUrl?.trim())
-    if (firstWithUrl) {
-      targetUrl = firstWithUrl.whipUrl.trim()
-    }
-  }
-
-  if (!targetUrl) {
-    toast.error('URL WHIP Kosong', 'Target speaker belum memiliki URL endpoint WHIP.')
+  if (allSpeakers.length === 0) {
+    toast.error('Tidak Ada Speaker', 'Tidak ada perangkat speaker aktif yang terdaftar di sistem.')
     return
   }
 
-  const success = await whipAudio.startPublish(targetUrl)
+  const rawUrls = allSpeakers.map(s => s.whipUrl?.trim() || `https://stream.zakuyu.fun/${s.id}/whip`).filter(Boolean)
+  const uniqueUrls = [...new Set(rawUrls)]
+
+  if (uniqueUrls.length === 0) {
+    toast.error('URL WHIP Kosong', 'Speaker terdaftar belum memiliki endpoint WHIP yang valid.')
+    return
+  }
+
+  const success = await whipAudio.startPublish(uniqueUrls)
   if (success) {
-    toast.success('Audio Paging ON AIR', `Siaran langsung terhubung ke ${targetLabel}.`)
+    allSpeakers.forEach(s => audioStore.setTransmissionStatus(s.id, true))
+    toast.success('SIARAN DARURAT AKTIF', `Terhubung secara serentak ke seluruh ${allSpeakers.length} speaker terdaftar.`)
   } else {
-    toast.error('Gagal Siaran Audio', whipAudio.publishError.value || 'Periksa mikrofon atau koneksi WHIP server.')
+    toast.error('Gagal Siaran Darurat', whipAudio.publishError.value || 'Periksa mikrofon atau koneksi WHIP.')
   }
 }
 
@@ -789,11 +815,21 @@ async function confirmResolveEvent() {
 onMounted(() => {
   refreshAllData()
   cctvStore.startCameraStatusPolling(1000)
+
+  // Auto-ping audio tiap 10 detik di dashboard
+  executeDashboardAudioPing({ silent: true })
+  dashboardPingTimer = setInterval(() => {
+    executeDashboardAudioPing({ silent: true })
+  }, 10000)
 })
 
 onUnmounted(() => {
   if (whipAudio.isPublishing.value) {
     whipAudio.stopPublish()
+  }
+  if (dashboardPingTimer) {
+    clearInterval(dashboardPingTimer)
+    dashboardPingTimer = null
   }
   cctvStore.stopCameraStatusPolling()
 })

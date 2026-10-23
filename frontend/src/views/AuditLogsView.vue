@@ -4,13 +4,13 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#283548]">
       <div>
         <div class="flex items-center gap-2 flex-wrap">
-          <h2 class="text-lg font-bold text-slate-100 tracking-tight">Audit Trail & Log Administratif</h2>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/70 text-amber-300 border border-amber-800">
+          <h2 class="text-lg font-bold text-slate-100 tracking-tight">Audit Trail & Log</h2>
+          <!-- <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/70 text-amber-300 border border-amber-800">
             ADMIN ONLY
-          </span>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-800">
+          </span> -->
+          <!-- <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-800">
             APPEND-ONLY (IMMUTABLE)
-          </span>
+          </span> -->
         </div>
         <p class="text-xs text-slate-400 mt-1 font-mono">
           Jejak aktivitas keamanan append-only. <strong>Log ini dilindungi database trigger dan tidak dapat dimodifikasi atau dihapus oleh siapapun.</strong>
@@ -37,7 +37,7 @@
           <Download class="w-3.5 h-3.5 mr-1.5" />
           Ekspor CSV
         </Button>
-
+<!-- 
         <Button
           variant="secondary"
           size="sm"
@@ -45,54 +45,7 @@
         >
           <FileCode class="w-3.5 h-3.5 mr-1.5" />
           JSON
-        </Button>
-      </div>
-    </div>
-
-    <!-- Metric Summary Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between shadow-xs">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block tracking-wider">Total Log Keamanan:</span>
-          <p class="text-xl font-bold text-slate-100">{{ auditStore.stats.total }}</p>
-          <span class="text-[10px] text-slate-500 block mt-0.5">Seluruh jejak terekam</span>
-        </div>
-        <div class="w-9 h-9 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
-          <ClipboardList class="w-4 h-4" />
-        </div>
-      </div>
-
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between shadow-xs">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block tracking-wider">Aktivitas Berhasil:</span>
-          <p class="text-xl font-bold text-emerald-400">{{ auditStore.stats.successCount }}</p>
-          <span class="text-[10px] text-emerald-500/70 block mt-0.5">Operasi terverifikasi</span>
-        </div>
-        <div class="w-9 h-9 rounded-lg bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-          <ShieldCheck class="w-4 h-4" />
-        </div>
-      </div>
-
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between shadow-xs">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block tracking-wider">Gagal / Peringatan:</span>
-          <p class="text-xl font-bold text-rose-400">{{ auditStore.stats.failureCount }}</p>
-          <span class="text-[10px] text-rose-500/70 block mt-0.5">Akses ditolak / anomali</span>
-        </div>
-        <div class="w-9 h-9 rounded-lg bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
-          <AlertTriangle class="w-4 h-4" />
-        </div>
-      </div>
-
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between shadow-xs">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block tracking-wider">Aktivitas Hari Ini:</span>
-          <p class="text-xl font-bold text-indigo-400">{{ auditStore.stats.todayCount }}</p>
-          <span class="text-[10px] text-indigo-400/70 block mt-0.5">WIB (00:00 - sekarang)</span>
-        </div>
-        <div class="w-9 h-9 rounded-lg bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
-          <Clock class="w-4 h-4" />
-        </div>
+        </Button> -->
       </div>
     </div>
 
@@ -117,44 +70,6 @@
           >
             <X class="w-3.5 h-3.5" />
           </button>
-        </div>
-
-        <!-- Filter Selects -->
-        <div class="flex flex-wrap items-center gap-2">
-          <!-- Filter Hasil -->
-          <select
-            v-model="filters.result"
-            class="bg-[#111827] border border-[#283548] text-slate-200 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
-            @change="applyFilters"
-          >
-            <option value="ALL">Semua Hasil</option>
-            <option value="SUCCESS">Hasil: SUCCESS</option>
-            <option value="FAILURE">Hasil: FAILURE</option>
-          </select>
-
-          <!-- Filter Entitas -->
-          <select
-            v-model="filters.entityType"
-            class="bg-[#111827] border border-[#283548] text-slate-200 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
-            @change="applyFilters"
-          >
-            <option value="ALL">Semua Tipe Entitas</option>
-            <option v-for="ent in availableEntities" :key="ent" :value="ent">
-              Entitas: {{ ent.toUpperCase() }}
-            </option>
-          </select>
-
-          <!-- Filter Aksi -->
-          <select
-            v-model="filters.action"
-            class="bg-[#111827] border border-[#283548] text-slate-200 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:border-blue-500 cursor-pointer max-w-[200px] truncate"
-            @change="applyFilters"
-          >
-            <option value="ALL">Semua Tipe Aksi</option>
-            <option v-for="act in availableActions" :key="act" :value="act">
-              {{ act }}
-            </option>
-          </select>
         </div>
       </div>
 

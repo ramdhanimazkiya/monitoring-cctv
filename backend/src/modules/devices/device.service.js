@@ -273,27 +273,43 @@ export async function deleteZone(id, userId, req) {
   const existing = await prisma.zone.findFirst({ where: { id, deletedAt: null } });
   if (!existing) throw new NotFoundError(`Zona dengan ID ${id} tidak ditemukan`);
 
-  const activeDevices =
-    (await prisma.camera.count({ where: { zoneId: id, deletedAt: null } })) +
-    (await prisma.audioDevice.count({ where: { zoneId: id, deletedAt: null } }));
+  // Opsi A: Jika zona memiliki perangkat aktif (CCTV atau Audio), lepaskan penugasan zona
+  // (zoneId = null) sehingga perangkat TIDAK ikut hilang dan tetap aktif dipantau di Site terkait.
+  const [detachedCameras, detachedAudio, updated] = await prisma.$transaction([
+    prisma.camera.updateMany({
+      where: { zoneId: id, deletedAt: null },
+      data: { zoneId: null },
+    }),
+    prisma.audioDevice.updateMany({
+      where: { zoneId: id, deletedAt: null },
+      data: { zoneId: null },
+    }),
+    prisma.zone.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    }),
+  ]);
 
-  if (activeDevices > 0) {
-    throw new BadRequestError("Tidak dapat menghapus zona yang masih memiliki perangkat aktif");
-  }
-
-  const updated = await prisma.zone.update({
-    where: { id },
-    data: { deletedAt: new Date() },
-  });
   await recordAuditLog({
     userId,
     action: "ZONE_DELETED",
     entityType: "zone",
     entityId: id,
     before: existing,
+    after: updated,
+    detail: {
+      strategy: "OPTION_A_DETACH_DEVICES",
+      detachedCamerasCount: detachedCameras.count,
+      detachedAudioCount: detachedAudio.count,
+    },
     req,
   });
-  return updated;
+
+  return {
+    ...updated,
+    detachedCamerasCount: detachedCameras.count,
+    detachedAudioCount: detachedAudio.count,
+  };
 }
 
 // -----------------------------------------------------------------------------

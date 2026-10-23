@@ -177,8 +177,11 @@ export const useCctvStore = defineStore('cctv', () => {
       if (!res.ok || !body.success) {
         throw new Error(body.error?.message || body.message || 'Gagal menghapus zona')
       }
-      await fetchSitesAndZones()
-      return true
+      await Promise.all([
+        fetchSitesAndZones(),
+        fetchCameras()
+      ])
+      return body
     } finally {
       loading.value = false
     }

@@ -10,9 +10,9 @@
           <div>
             <div class="flex items-center gap-2 flex-wrap">
               <h2 class="text-lg font-bold text-slate-100 tracking-tight">CCTV Monitoring</h2>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-950/70 text-blue-300 border border-blue-600/50">
+              <!-- <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-950/70 text-blue-300 border border-blue-600/50">
                 GRID & LEAFLET MAPS
-              </span>
+              </span> -->
             </div>
             <p class="text-xs text-slate-400 font-mono mt-0.5">
               Matriks pemantauan live streaming CCTV terintegrasi dengan pemetaan geospasial Leaflet OpenStreetMap.
@@ -145,6 +145,7 @@
           ref="deviceMapRef"
           :devices="filteredMapCameras"
           @select-camera="handleMapSelectCamera"
+          @inspect-camera="handleInspectCamera"
         />
       </div>
 
@@ -388,9 +389,14 @@ function setViewMode(mode) {
 
 function handleMapSelectCamera(cam) {
   if (!cam) return
-  if (cam.latitude && cam.longitude) {
-    deviceMapRef.value?.selectCamera(cam)
-  }
+  // Marker already opened its popup directly on the map.
+  // We do NOT call selectCamera here because re-flying closes the popup immediately.
+}
+
+function handleInspectCamera(cam) {
+  if (!cam) return
+  activeViewMode.value = 'grid'
+  toast.info('Beralih ke Video Grid', `Menampilkan feed kamera ${cam.name} (${cam.id})`)
 }
 
 function flyToCameraOnMap(cam) {

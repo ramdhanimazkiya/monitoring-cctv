@@ -3,13 +3,100 @@ import { ref, computed } from 'vue'
 
 const STORAGE_KEY = 'cctv_audio_speakers_v1'
 
-const INITIAL_SPEAKERS = []
+const INITIAL_SPEAKERS = [
+  {
+    id: 'AUD-0001',
+    name: 'Speaker 1',
+    siteId: 'SIT-001',
+    zoneId: 'ZON-001',
+    zoneName: 'Zona 1 - Ruang Makan',
+    whipUrl: 'https://stream.zakuyu.fun/audio_raw_1/whip',
+    rtspUrl: 'rtsp://stream.zakuyu.fun:8554/audio_1',
+    latitude: -6.917464,
+    longitude: 107.619122,
+    sampleRate: 16000,
+    channels: 1,
+    volume: 85,
+    status: 'ONLINE',
+    latencyMs: 24,
+    lastPingAt: 'Baru saja',
+    isActive: true
+  },
+  {
+    id: 'AUD-0002',
+    name: 'Speaker 2',
+    siteId: 'SIT-001',
+    zoneId: 'ZON-001',
+    zoneName: 'Zona 1 - Ruang Makan',
+    whipUrl: 'https://stream.zakuyu.fun/audio_raw_2/whip',
+    rtspUrl: 'rtsp://stream.zakuyu.fun:8554/audio_2',
+    latitude: -6.918100,
+    longitude: 107.619800,
+    sampleRate: 16000,
+    channels: 1,
+    volume: 90,
+    status: 'ONLINE',
+    latencyMs: 38,
+    lastPingAt: 'Baru saja',
+    isActive: true
+  },
+  {
+    id: 'AUD-0003',
+    name: 'Speaker 3',
+    siteId: 'SIT-001',
+    zoneId: 'ZON-002',
+    zoneName: 'Zona 2 - Ruang Beranak',
+    whipUrl: 'https://stream.zakuyu.fun/audio_raw_3/whip',
+    rtspUrl: 'rtsp://stream.zakuyu.fun:8554/audio_3',
+    latitude: -6.916800,
+    longitude: 107.618500,
+    sampleRate: 16000,
+    channels: 1,
+    volume: 80,
+    status: 'ONLINE',
+    latencyMs: 19,
+    lastPingAt: 'Baru saja',
+    isActive: true
+  },
+  {
+    id: 'AUD-0004',
+    name: 'Speaker 4',
+    siteId: 'SIT-001',
+    zoneId: 'ZON-002',
+    zoneName: 'Zona 2 - Ruang Beranak',
+    whipUrl: 'https://stream.zakuyu.fun/audio_raw_4/whip',
+    rtspUrl: 'rtsp://stream.zakuyu.fun:8554/audio_4',
+    latitude: -6.916200,
+    longitude: 107.618200,
+    sampleRate: 16000,
+    channels: 1,
+    volume: 80,
+    status: 'ONLINE',
+    latencyMs: 25,
+    lastPingAt: 'Baru saja',
+    isActive: true
+  },
+  {
+    id: 'AUD-0005',
+    name: 'Speaker 5',
+    siteId: 'SIT-001',
+    zoneId: 'ZON-002',
+    zoneName: 'Zona 2 - Ruang Beranak',
+    whipUrl: 'https://stream.zakuyu.fun/audio_raw_5/whip',
+    rtspUrl: 'rtsp://stream.zakuyu.fun:8554/audio_5',
+    latitude: -6.915900,
+    longitude: 107.617900,
+    sampleRate: 16000,
+    channels: 1,
+    volume: 85,
+    status: 'ONLINE',
+    latencyMs: 22,
+    lastPingAt: 'Baru saja',
+    isActive: true
+  }
+]
 
 export const useAudioDevicesStore = defineStore('audioDevices', () => {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(STORAGE_KEY)
-  }
-
   // Load from localStorage or defaults
   const devices = ref(loadFromStorage())
 
@@ -22,6 +109,7 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
           return parsed.map(d => ({
             ...d,
             status: d.status || 'UNKNOWN',
+            rtspUrl: d.rtspUrl || (d.whipUrl ? d.whipUrl.replace('/whip', '').replace('https://stream.zakuyu.fun/audio_raw_', 'rtsp://stream.zakuyu.fun:8554/audio_') : ''),
             latitude: d.latitude !== undefined ? d.latitude : (d.id === 'AUD-0001' ? -6.917464 : d.id === 'AUD-0002' ? -6.918100 : -6.916800),
             longitude: d.longitude !== undefined ? d.longitude : (d.id === 'AUD-0001' ? 107.619122 : d.id === 'AUD-0002' ? 107.619800 : 107.618500)
           }))
@@ -75,7 +163,7 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
       siteId: payload.siteId || null,
       zoneId: payload.zoneId || null,
       zoneName: payload.zoneName || '-',
-      whipUrl: payload.whipUrl?.trim() || '',
+      whipUrl: payload.whipUrl?.trim() || `https://stream.zakuyu.fun/${nextId}/whip`,
       latitude: payload.latitude !== null && payload.latitude !== undefined && payload.latitude !== '' ? Number(payload.latitude) : null,
       longitude: payload.longitude !== null && payload.longitude !== undefined && payload.longitude !== '' ? Number(payload.longitude) : null,
       sampleRate: 16000, // Enforce 16kHz
@@ -204,9 +292,10 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
       return
     }
 
-    if (id.startsWith('ZON-')) {
+    if (id.startsWith('ZON-') || id.startsWith('ZONE_')) {
+      const cleanZoneId = id.replace('ZONE_', '')
       devices.value.forEach(d => {
-        if (d.zoneId === id && d.isActive) {
+        if ((d.zoneId === cleanZoneId || d.zoneName === cleanZoneId) && d.isActive) {
           d.status = revertStatus(d)
         }
       })
@@ -221,6 +310,16 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
     }
   }
 
+  function resetToDemoSpeakers() {
+    devices.value = JSON.parse(JSON.stringify(INITIAL_SPEAKERS))
+    saveToStorage()
+    return devices.value
+  }
+
+  async function fetchDevices() {
+    return activeDevices.value
+  }
+
   return {
     devices,
     activeDevices,
@@ -230,6 +329,8 @@ export const useAudioDevicesStore = defineStore('audioDevices', () => {
     updateDevice,
     deleteDevice,
     pingDevice,
-    setTransmissionStatus
+    setTransmissionStatus,
+    fetchDevices,
+    resetToDemoSpeakers
   }
 })

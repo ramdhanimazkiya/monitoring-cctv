@@ -5,12 +5,12 @@
       <div>
         <div class="flex items-center gap-2 flex-wrap">
           <h2 class="text-lg font-bold text-slate-100 tracking-tight">Event & Alarm Monitoring</h2>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-950/70 text-rose-300 border border-rose-800">
+          <!-- <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-950/70 text-rose-300 border border-rose-800">
             OFFLINE ALERTS
           </span>
           <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-800">
             RESOLVED HISTORY
-          </span>
+          </span> -->
         </div>
         <p class="text-xs text-slate-400 mt-1 font-mono">
           Monitoring khusus deteksi perangkat OFFLINE dan riwayat pemulihan koneksi (RESOLVED).
@@ -36,15 +36,6 @@
         >
           <Download class="w-3.5 h-3.5 mr-1.5" />
           Ekspor CSV
-        </Button>
-
-        <Button
-          variant="secondary"
-          size="sm"
-          @click="handleExport('json')"
-        >
-          <FileCode class="w-3.5 h-3.5 mr-1.5" />
-          JSON
         </Button>
       </div>
     </div>

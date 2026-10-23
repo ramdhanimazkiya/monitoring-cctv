@@ -4,7 +4,7 @@
       <div>
         <div class="flex items-center gap-2">
           <h2 class="text-lg font-bold text-slate-100 tracking-tight">System Settings</h2>
-          <Badge status="ACTIVE" label="ADMIN ONLY" size="xs" />
+          <!-- <Badge status="ACTIVE" label="ADMIN ONLY" size="xs" /> -->
         </div>
         <p class="text-xs text-slate-400 mt-0.5 font-mono">
           Konfigurasi sistem global (disimpan pada tabel system_settings di PostgreSQL).

@@ -4,13 +4,13 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#283548]">
       <div>
         <div class="flex items-center gap-2 flex-wrap">
-          <h2 class="text-lg font-bold text-slate-100 tracking-tight">Manajemen Pengguna (User Management)</h2>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/70 text-amber-300 border border-amber-800">
+          <h2 class="text-lg font-bold text-slate-100 tracking-tight">Manajemen Pengguna</h2>
+          <!-- <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/70 text-amber-300 border border-amber-800">
             ADMINISTRASI
-          </span>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-950/70 text-blue-300 border border-blue-800">
+          </span> -->
+          <!-- <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-950/70 text-blue-300 border border-blue-800">
             RBAC
-          </span>
+          </span> -->
         </div>
         <p class="text-xs text-slate-400 mt-1 font-mono">
           Pengaturan akun pengguna sistem dan pembagian hak peran (Admin / Operator).
@@ -24,39 +24,7 @@
         </Button>
       </div>
     </div>
-
-    <!-- Metric Summary Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block">Total Pengguna:</span>
-          <p class="text-xl font-bold text-slate-100">{{ usersStore.users.length }}</p>
-        </div>
-        <div class="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
-          <Users class="w-4 h-4" />
-        </div>
-      </div>
-
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block">Administrator:</span>
-          <p class="text-xl font-bold text-amber-400">{{ totalAdmins }}</p>
-        </div>
-        <div class="w-8 h-8 rounded-lg bg-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-          <ShieldCheck class="w-4 h-4" />
-        </div>
-      </div>
-
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block">Operator:</span>
-          <p class="text-xl font-bold text-indigo-400">{{ totalOperators }}</p>
-        </div>
-        <div class="w-8 h-8 rounded-lg bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
-          <UserCheck class="w-4 h-4" />
-        </div>
-      </div>
-    </div>
+   
 
     <!-- Filter & Search Controls -->
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#0d131f] border border-[#1e2a3b] p-2.5 rounded-xl text-xs font-mono">
@@ -210,7 +178,7 @@
     <Modal
       v-model="userModalOpen"
       :title="userModalMode === 'create' ? 'Tambah Pengguna Baru' : `Edit Pengguna: ${activeUser.id}`"
-      description="Kelola akun pengguna dan hak akses peran (RBAC)."
+      description="Kelola akun pengguna dan hak akses peran."
       size="md"
     >
       <div class="space-y-3.5">
@@ -218,7 +186,7 @@
         <div class="p-2.5 rounded bg-[#151d2e] border border-[#283548] text-xs font-mono flex items-center justify-between">
           <span class="text-slate-400">ID Pengguna (Terkunci & Immutable): </span>
           <strong class="text-purple-400 font-bold">
-            {{ userModalMode === 'create' ? `[AUTO: ${previewNextUserId}]` : activeUser.id }}
+            {{ userModalMode === 'create' ? '[AUTO GENERATE]' : activeUser.id }}
           </strong>
         </div>
 
@@ -250,7 +218,7 @@
               class="w-full bg-[#111827] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="OPERATOR">OPERATOR</option>
-              <option value="ADMIN">ADMIN (Akses Penuh Semua Modul)</option>
+              <option value="ADMIN">ADMIN</option>
             </select>
           </div>
         </div>
@@ -349,7 +317,7 @@ const pageSize = 5
 const currentPage = ref(1)
 
 const columns = [
-  { key: 'id', label: 'ID speaker', width: 'w-28' },
+  { key: 'id', label: 'ID Pengguna', width: 'w-28' },
   { key: 'user', label: 'Username' },
   { key: 'fullName', label: 'Nama Lengkap' },
   { key: 'role', label: 'Peran (Role)', width: 'w-32' },
@@ -403,15 +371,6 @@ const activeUser = reactive({
   password: '',
   role: 'OPERATOR',
   isActive: true
-})
-
-const previewNextUserId = computed(() => {
-  const nums = usersStore.users.map((u) => {
-    const m = String(u.id).match(/\d+/)
-    return m ? parseInt(m[0], 10) : 0
-  })
-  const maxNum = nums.length > 0 ? Math.max(...nums) : 0
-  return `USR-${String(maxNum + 1).padStart(4, '0')}`
 })
 
 function openCreateUserModal() {

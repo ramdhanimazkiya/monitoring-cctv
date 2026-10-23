@@ -15,14 +15,15 @@ export function useWhipAudio() {
   const publishError = ref('')
   const audioLevel = ref(0) // 0 - 100 for VU meter
   const durationSeconds = ref(0)
+  const targetUrls = ref([])
+  const activeSessionsCount = ref(0)
 
-  let pttPeerConnection = null
+  let pttSessions = [] // Array of { url, pc, resourceUrl }
   let pttMediaStream = null
   let pttAudioContext = null
   let pttAnalyser = null
   let pttAnimFrameId = null
   let pttTimerInterval = null
-  let pttResourceUrl = null
 
   // Check WebRTC support
   const isSupported = typeof window !== 'undefined' &&
@@ -138,27 +139,141 @@ export function useWhipAudio() {
   }
 
   /**
-   * Start WHIP Publishing (Microphone 16kHz Mono -> MediaMTX)
+   * Helper to establish a single WHIP WebRTC connection using transceiver & cloned track
    */
-  async function startPublish(customWhipUrl) {
-    if (isPublishing.value) return false
+  async function connectSingleWhipSession(endpointUrl, sharedStream) {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ],
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
+    })
 
-    if (customWhipUrl) {
-      whipUrl.value = customWhipUrl
+    // Clone the audio track for each RTCPeerConnection to ensure separate encoding & capture sink
+    const originalTrack = sharedStream.getAudioTracks()[0]
+    if (!originalTrack) {
+      try { pc.close() } catch (_) {}
+      throw new Error('Track audio mikrofon tidak tersedia.')
+    }
+    const clonedTrack = originalTrack.clone()
+    const sessionStream = new MediaStream([clonedTrack])
+
+    const transceiver = pc.addTransceiver(clonedTrack, {
+      direction: 'sendonly',
+      streams: [sessionStream]
+    })
+
+    if (transceiver.setCodecPreferences && typeof RTCRtpSender.getCapabilities === 'function') {
+      try {
+        const capabilities = RTCRtpSender.getCapabilities('audio')
+        if (capabilities?.codecs) {
+          const opusCodecs = capabilities.codecs.filter(c => c.mimeType.toLowerCase() === 'audio/opus')
+          if (opusCodecs.length > 0) {
+            transceiver.setCodecPreferences(opusCodecs)
+          }
+        }
+      } catch (err) {
+        console.warn('setCodecPreferences warning:', err)
+      }
     }
 
-    if (!whipUrl.value || !whipUrl.value.trim()) {
-      publishError.value = 'URL WHIP belum dikonfigurasi.'
+    pc.onconnectionstatechange = () => {
+      console.log(`[${endpointUrl}] WebRTC connectionState:`, pc.connectionState)
+    }
+
+    // Create SDP Offer
+    const offer = await pc.createOffer()
+    let sdp = offer.sdp
+
+    if (sdp.includes('useinbandfec=1')) {
+      sdp = sdp.replace(/useinbandfec=1/, 'useinbandfec=1; maxplaybackrate=16000; ptime=10; stereo=0; sprop-stereo=0')
+    } else {
+      sdp = enforceOpus16kMono(sdp)
+    }
+
+    await pc.setLocalDescription({ type: offer.type, sdp })
+
+    // Wait for ICE gathering
+    await waitForIceGathering(pc, 2000)
+
+    const finalOfferSdp = pc.localDescription?.sdp || sdp
+
+    // Send POST to WHIP endpoint
+    const response = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/sdp'
+      },
+      body: finalOfferSdp
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '')
+      try { clonedTrack.stop() } catch (_) {}
+      try { pc.close() } catch (_) {}
+      throw new Error(`WHIP error on ${endpointUrl}: ${response.status} ${errorText || response.statusText}`)
+    }
+
+    // Save resource location for termination
+    const locHeader = response.headers.get('Location')
+    let resourceUrl = null
+    if (locHeader) {
+      resourceUrl = locHeader.startsWith('http')
+        ? locHeader
+        : new URL(locHeader, endpointUrl).href
+    }
+
+    // Set remote description with SDP Answer
+    const answerSdp = await response.text()
+    await pc.setRemoteDescription({
+      type: 'answer',
+      sdp: answerSdp
+    })
+
+    return {
+      url: endpointUrl,
+      pc,
+      clonedTrack,
+      resourceUrl
+    }
+  }
+
+  /**
+   * Start WHIP Publishing (Microphone 16kHz Mono -> MediaMTX)
+   * Supports either a single WHIP URL or an Array of WHIP URLs (Multi-Publish Paralel)
+   */
+  async function startPublish(customWhipUrlOrUrls) {
+    if (isPublishing.value) return false
+
+    let urls = []
+    if (Array.isArray(customWhipUrlOrUrls)) {
+      urls = customWhipUrlOrUrls.map(u => String(u || '').trim()).filter(Boolean)
+    } else if (typeof customWhipUrlOrUrls === 'string' && customWhipUrlOrUrls.trim()) {
+      urls = [customWhipUrlOrUrls.trim()]
+    } else if (whipUrl.value && whipUrl.value.trim()) {
+      urls = [whipUrl.value.trim()]
+    }
+
+    // Deduplicate URLs to prevent duplicate concurrent sessions to the same MediaMTX path
+    const uniqueUrls = [...new Set(urls)]
+
+    if (uniqueUrls.length === 0) {
+      publishError.value = 'Pilih minimal satu speaker aktif yang memiliki endpoint WHIP.'
       publishState.value = 'error'
       return false
     }
 
+    targetUrls.value = uniqueUrls
+    whipUrl.value = uniqueUrls[0] // Set primary URL for display
     publishError.value = ''
     publishState.value = 'requesting_mic'
     durationSeconds.value = 0
+    activeSessionsCount.value = 0
 
     try {
-      // 1. Get user microphone stream CONSTRAINED TO 16kHz & MONO
+      // 1. Get user microphone stream CONSTRAINED TO 16kHz & MONO (once for all speakers)
       pttMediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: { ideal: 16000, max: 16000 },
@@ -173,76 +288,50 @@ export function useWhipAudio() {
       publishState.value = 'connecting'
       startAudioMeter(pttMediaStream)
 
-      // 2. Setup RTCPeerConnection
-      pttPeerConnection = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      // 2. Connect in parallel to all unique target WHIP endpoints using addTransceiver
+      const connectionPromises = uniqueUrls.map(url => connectSingleWhipSession(url, pttMediaStream))
+      const results = await Promise.allSettled(connectionPromises)
+
+      const successfulSessions = []
+      const errors = []
+
+      results.forEach((res, idx) => {
+        if (res.status === 'fulfilled') {
+          successfulSessions.push(res.value)
+        } else {
+          console.warn(`Gagal menghubungkan WHIP ke ${uniqueUrls[idx]}:`, res.reason)
+          errors.push(res.reason?.message || `Koneksi ke ${uniqueUrls[idx]} gagal`)
+        }
       })
 
-      // Add audio tracks
-      pttMediaStream.getAudioTracks().forEach(track => {
-        pttPeerConnection.addTrack(track, pttMediaStream)
-      })
-
-      // 3. Create SDP Offer & Enforce 16kHz Mono
-      const offer = await pttPeerConnection.createOffer()
-      const modifiedSdp = enforceOpus16kMono(offer.sdp)
-      await pttPeerConnection.setLocalDescription({
-        type: 'offer',
-        sdp: modifiedSdp
-      })
-
-      // 4. Wait for ICE gathering
-      await waitForIceGathering(pttPeerConnection)
-
-      // 5. Send POST to WHIP endpoint
-      const response = await fetch(whipUrl.value, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/sdp'
-        },
-        body: pttPeerConnection.localDescription.sdp
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '')
-        throw new Error(`Server WHIP error (${response.status}): ${errorText || response.statusText}`)
+      if (successfulSessions.length === 0) {
+        throw new Error(errors[0] || 'Semua koneksi siaran audio ke server WHIP gagal.')
       }
 
-      // Save resource location for termination
-      const locHeader = response.headers.get('Location')
-      if (locHeader) {
-        pttResourceUrl = locHeader.startsWith('http')
-          ? locHeader
-          : new URL(locHeader, whipUrl.value).href
-      } else {
-        pttResourceUrl = null
-      }
-
-      // 6. Set remote description with SDP Answer
-      const answerSdp = await response.text()
-      await pttPeerConnection.setRemoteDescription({
-        type: 'answer',
-        sdp: answerSdp
-      })
-
+      pttSessions = successfulSessions
+      activeSessionsCount.value = successfulSessions.length
       isPublishing.value = true
       publishState.value = 'live'
 
-      // Start timer
+      // Start duration timer
       pttTimerInterval = setInterval(() => {
         durationSeconds.value++
       }, 1000)
 
-      // Watch connection state
-      pttPeerConnection.oniceconnectionstatechange = () => {
-        if (!pttPeerConnection) return
-        if (['failed', 'disconnected', 'closed'].includes(pttPeerConnection.iceConnectionState)) {
-          if (isPublishing.value) {
-            publishError.value = `Koneksi audio terputus (${pttPeerConnection.iceConnectionState})`
+      // Watch connection state across all peer connections
+      successfulSessions.forEach((sess) => {
+        sess.pc.oniceconnectionstatechange = () => {
+          const aliveSessions = pttSessions.filter(
+            s => s.pc && !['failed', 'closed'].includes(s.pc.iceConnectionState)
+          )
+          activeSessionsCount.value = aliveSessions.length
+
+          if (aliveSessions.length === 0 && isPublishing.value) {
+            publishError.value = 'Semua koneksi audio speaker terputus.'
             stopPublish()
           }
         }
-      }
+      })
 
       return true
     } catch (err) {
@@ -260,12 +349,13 @@ export function useWhipAudio() {
   }
 
   /**
-   * Stop WHIP Publishing
+   * Stop WHIP Publishing across all sessions
    */
   async function stopPublish() {
     isPublishing.value = false
     publishState.value = 'idle'
     isPttLocked.value = false
+    activeSessionsCount.value = 0
 
     if (pttTimerInterval) {
       clearInterval(pttTimerInterval)
@@ -282,22 +372,27 @@ export function useWhipAudio() {
       pttMediaStream = null
     }
 
-    // Terminate WHIP session on server if URL exists
-    const urlToDelete = pttResourceUrl
-    pttResourceUrl = null
-    if (urlToDelete) {
-      try {
-        fetch(urlToDelete, { method: 'DELETE' }).catch(() => {})
-      } catch (_) {}
-    }
+    // Terminate all WHIP sessions on server & close peer connections
+    const sessionsToClose = [...pttSessions]
+    pttSessions = []
 
-    // Close PeerConnection
-    if (pttPeerConnection) {
-      try {
-        pttPeerConnection.close()
-      } catch (_) {}
-      pttPeerConnection = null
-    }
+    await Promise.allSettled(sessionsToClose.map(async (sess) => {
+      if (sess.clonedTrack) {
+        try {
+          sess.clonedTrack.stop()
+        } catch (_) {}
+      }
+      if (sess.resourceUrl) {
+        try {
+          await fetch(sess.resourceUrl, { method: 'DELETE' })
+        } catch (_) {}
+      }
+      if (sess.pc) {
+        try {
+          sess.pc.close()
+        } catch (_) {}
+      }
+    }))
   }
 
   // Cleanup on unmount
@@ -308,6 +403,8 @@ export function useWhipAudio() {
   return {
     isSupported,
     whipUrl,
+    targetUrls,
+    activeSessionsCount,
     sampleRate,
     channelCount,
     isPublishing,
