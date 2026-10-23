@@ -428,21 +428,11 @@ export const useCctvStore = defineStore('cctv', () => {
     let data = null
     let latencyMs = 0
     let is404 = false
-    let is401 = false
 
     try {
-      // 1. Direct fetch ke MediaMTX API /v3/paths/get/{name} dengan JWT token jika tersedia
+      // 1. Direct fetch ke MediaMTX API /v3/paths/get/{name} (murni tanpa JWT karena sudah di-exclude di mediamtx.yml)
       try {
-        const authStore = useAuthStore()
-        const headers = { Accept: 'application/json' }
-        let directUrl = `https://api.zakuyu.fun/v3/paths/get/${cleanPath}`
-        if (authStore.cctvToken) {
-          headers['Authorization'] = `Bearer ${authStore.cctvToken}`
-          directUrl += `?jwt=${encodeURIComponent(authStore.cctvToken)}`
-        }
-
-        const response = await fetch(directUrl, {
-          headers,
+        const response = await fetch(`https://api.zakuyu.fun/v3/paths/get/${cleanPath}`, {
           cache: 'no-store',
           signal: AbortSignal.timeout(1500)
         })
@@ -451,8 +441,6 @@ export const useCctvStore = defineStore('cctv', () => {
           data = await response.json()
         } else if (response.status === 404) {
           is404 = true
-        } else if (response.status === 401) {
-          is401 = true
         }
       } catch (directErr) {
         // Fallback melalui backend proxy jika direct fetch terhalang
@@ -466,23 +454,10 @@ export const useCctvStore = defineStore('cctv', () => {
             data = await fallbackRes.json()
           } else if (fallbackRes.status === 404) {
             is404 = true
-          } else if (fallbackRes.status === 401) {
-            is401 = true
           }
         } catch {
           // ignore
         }
-      }
-
-      // Jika terjadi 401 pada Control API, jangan vonis kamera sebagai OFFLINE.
-      // Seringkali stream video tetap aktif meskipun API control membatasi akses.
-      if (is401 && !data) {
-        if (!cam.status || cam.status === 'OFFLINE' || cam.status === 'UNKNOWN') {
-          cam.status = 'ONLINE'
-          cam.streamStatus = 'AVAILABLE'
-          cam.statusReason = 'Kamera aktif (stream diputar via WebRTC)'
-        }
-        return { success: true, status: cam.status }
       }
 
       const prevStatus = cam.status
