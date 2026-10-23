@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useAuthStore } from './auth.js'
 
 export const useCctvStore = defineStore('cctv', () => {
   // Bersihkan cache demo masa lalu jika ada di browser
@@ -571,7 +572,14 @@ export const useCctvStore = defineStore('cctv', () => {
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 4000)
 
-      await fetch(url.trim(), {
+      const authStore = useAuthStore()
+      let testUrl = url.trim()
+      if (authStore.cctvToken && !testUrl.includes('jwt=')) {
+        const sep = testUrl.includes('?') ? '&' : '?'
+        testUrl = `${testUrl}${sep}jwt=${encodeURIComponent(authStore.cctvToken)}`
+      }
+
+      await fetch(testUrl, {
         method: 'GET',
         mode: 'no-cors',
         cache: 'no-store',

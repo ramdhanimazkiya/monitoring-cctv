@@ -168,6 +168,7 @@ export async function login({ username, password, req = null }) {
 
   return {
     rawToken,
+    sessionId: String(session.id),
     user: safeUser,
     expiresAt,
   };

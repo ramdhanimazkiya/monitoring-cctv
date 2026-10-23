@@ -177,6 +177,9 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Hls from 'hls.js'
 import { Video, RotateCw, Volume2, VolumeX, Maximize } from '@lucide/vue'
+import { useAuthStore } from '../../stores/auth.js'
+
+const authStore = useAuthStore()
 
 const props = defineProps({
   streamUrl: {
@@ -272,7 +275,15 @@ const iframeUrl = computed(() => {
   const clean = props.streamUrl.replace(/\/whep$/, '').replace(/\/index\.m3u8$/, '')
   const base = clean.endsWith('/') ? clean : `${clean}/`
   const sep = base.includes('?') ? '&' : '?'
-  return `${base}${sep}autoplay=true&muted=true&controls=${props.controls ? 'true' : 'false'}&playsinline=true`
+  const jwtParam = authStore.cctvToken ? `jwt=${encodeURIComponent(authStore.cctvToken)}&` : ''
+  return `${base}${sep}${jwtParam}autoplay=true&muted=true&controls=${props.controls ? 'true' : 'false'}&playsinline=true`
+})
+
+const hlsSourceUrl = computed(() => {
+  if (!props.streamUrl) return ''
+  if (!authStore.cctvToken) return props.streamUrl
+  const sep = props.streamUrl.includes('?') ? '&' : '?'
+  return `${props.streamUrl}${sep}jwt=${encodeURIComponent(authStore.cctvToken)}`
 })
 
 function destroyPlayer() {
@@ -352,7 +363,7 @@ function initPlayer() {
       levelLoadingTimeOut: 10000
     })
 
-    hlsInstance.loadSource(props.streamUrl)
+    hlsInstance.loadSource(hlsSourceUrl.value)
     hlsInstance.attachMedia(video)
 
     hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -459,7 +470,8 @@ function requestFullscreen() {
 
 function openDirect() {
   if (props.streamUrl) {
-    window.open(props.streamUrl, '_blank')
+    const targetUrl = isWebPlayerStream.value ? iframeUrl.value : hlsSourceUrl.value
+    window.open(targetUrl, '_blank')
   }
 }
 
@@ -467,6 +479,16 @@ watch(
   () => props.streamUrl,
   (newUrl) => {
     if (newUrl && !isOffline.value) {
+      initPlayer()
+    }
+  }
+)
+
+watch(
+  () => authStore.cctvToken,
+  (newToken, oldToken) => {
+    // Jika token CCTV baru diterima saat stream aktif, muat ulang player
+    if (newToken && !oldToken && !isOffline.value) {
       initPlayer()
     }
   }

@@ -10,8 +10,10 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../../stores/auth.js'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const emit = defineEmits(['select-camera', 'inspect-camera'])
 
 const props = defineProps({
@@ -93,7 +95,8 @@ function getStreamMediaHtml(d) {
   const cleanUrl = streamUrl.replace(/\/whep$/, '').replace(/\/index\.m3u8$/, '')
   const base = cleanUrl.endsWith('/') ? cleanUrl : `${cleanUrl}/`
   const sep = base.includes('?') ? '&' : '?'
-  const iframeSrc = `${base}${sep}autoplay=true&muted=true&controls=false&playsinline=true`
+  const jwtParam = authStore.cctvToken ? `jwt=${encodeURIComponent(authStore.cctvToken)}&` : ''
+  const iframeSrc = `${base}${sep}${jwtParam}autoplay=true&muted=true&controls=false&playsinline=true`
 
   return `
     <div class="cctv-popup-player-container">

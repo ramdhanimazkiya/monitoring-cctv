@@ -31,6 +31,7 @@ const schema = z.object({
   STREAM_GATEWAY_URL: z.string().default("http://localhost:8554"),
   STREAM_GATEWAY_API_URL: z.string().default("http://localhost:9997"),
   STREAM_GATEWAY_TYPE: z.enum(["mediamtx", "go2rtc", "mock"]).default("mediamtx"),
+  CCTV_AUTH_URL: z.string().default("https://auth.zakuyu.fun/api/token"),
 });
 
 const parsed = schema.safeParse(process.env);

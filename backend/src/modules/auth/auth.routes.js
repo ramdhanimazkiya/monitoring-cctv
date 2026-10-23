@@ -13,6 +13,7 @@ router.post("/login", authRateLimiter, validateBody(loginSchema), authController
 // Endpoint terproteksi (memerlukan autentikasi sesi aktif)
 router.post("/logout", requireAuth, authController.logout);
 router.get("/me", requireAuth, authController.me);
+router.get("/cctv-token", requireAuth, authController.getCctvToken);
 router.post("/change-password", requireAuth, validateBody(changePasswordSchema), authController.changePassword);
 
 export default router;
