@@ -272,6 +272,10 @@ const isWebPlayerStream = computed(() => {
 
 const iframeUrl = computed(() => {
   if (!props.streamUrl) return ''
+  // Jangan muat iframe tanpa token jika stream mengarah ke server MediaMTX terproteksi
+  if (props.streamUrl.includes('zakuyu.fun') && !authStore.cctvToken) {
+    return ''
+  }
   const clean = props.streamUrl.replace(/\/whep$/, '').replace(/\/index\.m3u8$/, '')
   const base = clean.endsWith('/') ? clean : `${clean}/`
   const sep = base.includes('?') ? '&' : '?'
@@ -328,6 +332,14 @@ function initPlayer() {
     isLoading.value = false
     hasError.value = true
     errorMessage.value = 'URL Stream belum dikonfigurasi'
+    return
+  }
+
+  // Jika stream memerlukan token MediaMTX tapi belum ada di state, ambil token dulu
+  if (isWebPlayerStream.value && props.streamUrl.includes('zakuyu.fun') && !authStore.cctvToken) {
+    authStore.fetchCctvToken().then((token) => {
+      if (token) initPlayer()
+    })
     return
   }
 
