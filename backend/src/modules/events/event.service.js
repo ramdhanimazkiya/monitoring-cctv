@@ -44,7 +44,8 @@ function formatEvent(e) {
 
 export async function listEvents(params = {}) {
   const page = Math.max(1, Number(params.page) || 1);
-  const limit = Math.min(100, Math.max(1, Number(params.limit) || 20));
+  const maxLimit = params.isExport ? 10000 : 100;
+  const limit = Math.min(maxLimit, Math.max(1, Number(params.limit) || 20));
   const skip = (page - 1) * limit;
 
   // Filter inti: Hanya rekaman insiden OFFLINE dan RESOLVED
@@ -280,7 +281,16 @@ export async function getEventStats() {
     ],
   };
 
-  const [total, offlineActiveCount, resolvedCount, cameraCount, audioCount] = await Promise.all([
+  const [
+    total,
+    offlineActiveCount,
+    resolvedCount,
+    cameraCount,
+    audioCount,
+    cameraOfflineCount,
+    audioOfflineCount,
+    recap,
+  ] = await Promise.all([
     prisma.event.count({ where: baseCondition }),
     prisma.event.count({
       where: {
@@ -311,6 +321,37 @@ export async function getEventStats() {
         AND: [baseCondition, { audioDeviceId: { not: null } }],
       },
     }),
+    prisma.event.count({
+      where: {
+        AND: [
+          baseCondition,
+          { cameraId: { not: null } },
+          { status: { not: "RESOLVED" } },
+          {
+            OR: [
+              { title: { contains: "OFFLINE", mode: "insensitive" } },
+              { message: { contains: "OFFLINE", mode: "insensitive" } },
+            ],
+          },
+        ],
+      },
+    }),
+    prisma.event.count({
+      where: {
+        AND: [
+          baseCondition,
+          { audioDeviceId: { not: null } },
+          { status: { not: "RESOLVED" } },
+          {
+            OR: [
+              { title: { contains: "OFFLINE", mode: "insensitive" } },
+              { message: { contains: "OFFLINE", mode: "insensitive" } },
+            ],
+          },
+        ],
+      },
+    }),
+    getSystemRecap(),
   ]);
 
   return {
@@ -319,10 +360,57 @@ export async function getEventStats() {
     resolvedCount,
     cameraCount,
     audioCount,
+    cameraOfflineCount,
+    audioOfflineCount,
+    recap,
+  };
+}
+
+export async function getSystemRecap(params = {}) {
+  const commandDateFilter = {};
+  if (params.startDate) {
+    commandDateFilter.gte = new Date(params.startDate);
+  }
+  if (params.endDate) {
+    const end = new Date(params.endDate);
+    if (params.endDate.length <= 10) {
+      end.setHours(23, 59, 59, 999);
+    }
+    commandDateFilter.lte = end;
+  }
+
+  const hasDateFilter = Boolean(params.startDate || params.endDate);
+  const commandWhereDate = hasDateFilter ? { requestedAt: commandDateFilter } : {};
+
+  const [totalCameras, onlineCameras, offlineCameras, pttCount] = await Promise.all([
+    prisma.camera.count({ where: { deletedAt: null } }),
+    prisma.camera.count({ where: { deletedAt: null, status: "ONLINE" } }),
+    prisma.camera.count({ where: { deletedAt: null, status: "OFFLINE" } }),
+    prisma.audioCommand.count({
+      where: {
+        AND: [{ kind: "PTT" }, commandWhereDate],
+      },
+    }),
+  ]);
+
+  const onlinePercent =
+    totalCameras > 0 ? Number(((onlineCameras / totalCameras) * 100).toFixed(1)) : 100.0;
+  const offlinePercent =
+    totalCameras > 0 ? Number((100 - onlinePercent).toFixed(1)) : 0.0;
+
+  return {
+    cctv: {
+      onlinePercent,
+      offlinePercent,
+    },
+    audio: {
+      totalPtt: pttCount,
+      totalSessions: pttCount,
+    },
   };
 }
 
 export async function exportEvents(params = {}) {
-  const result = await listEvents({ ...params, page: 1, limit: 2000 });
+  const result = await listEvents({ ...params, page: 1, limit: 5000, isExport: true });
   return result.events;
 }

@@ -65,35 +65,33 @@ export async function resolve(req, res, next) {
   }
 }
 
+export async function getRecap(req, res, next) {
+  try {
+    const query = req.validatedQuery || req.query;
+    const data = await eventService.getSystemRecap(query);
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function exportEvents(req, res, next) {
   try {
     const query = req.validatedQuery || req.query;
-    const events = await eventService.exportEvents(query);
+    const [events, recap] = await Promise.all([
+      eventService.exportEvents(query),
+      eventService.getSystemRecap(query),
+    ]);
 
     const format = req.query.format || "csv";
     if (format === "json") {
-      res.setHeader("Content-Disposition", 'attachment; filename="events_alarms.json"');
+      res.setHeader("Content-Disposition", 'attachment; filename="laporan_event_alarm_rekapitulasi.json"');
       res.setHeader("Content-Type", "application/json");
-      return res.send(JSON.stringify(events, null, 2));
+      return res.send(JSON.stringify({ recap, events }, null, 2));
     }
-
-    // Default CSV
-    const headers = [
-      "ID",
-      "Waktu Kejadian",
-      "Tingkat",
-      "Tipe",
-      "Status",
-      "Judul",
-      "Pesan",
-      "Kamera ID",
-      "Audio Device ID",
-      "Site",
-      "Zona",
-      "Di-Acknowledge Oleh",
-      "Diselesaikan Oleh",
-      "Catatan Resolusi",
-    ];
 
     const escapeCsv = (val) => {
       if (val === null || val === undefined) return '""';
@@ -101,26 +99,119 @@ export async function exportEvents(req, res, next) {
       return `"${str}"`;
     };
 
-    const rows = events.map((e) => [
-      escapeCsv(e.id),
-      escapeCsv(e.occurredAt),
-      escapeCsv(e.severity),
-      escapeCsv(e.type),
-      escapeCsv(e.status),
-      escapeCsv(e.title),
-      escapeCsv(e.message),
-      escapeCsv(e.cameraId),
-      escapeCsv(e.audioDeviceId),
-      escapeCsv(e.siteName),
-      escapeCsv(e.zoneName),
-      escapeCsv(e.acknowledgedByName),
-      escapeCsv(e.resolvedByName),
-      escapeCsv(e.resolutionNote),
-    ]);
+    const formatWib = (isoStr) => {
+      if (!isoStr) return "-";
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return String(isoStr);
+      return (
+        d.toLocaleString("id-ID", {
+          timeZone: "Asia/Jakarta",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        }) + " WIB"
+      );
+    };
 
-    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
+    const nowWib = formatWib(new Date().toISOString());
+    const filterRangeStr =
+      query.startDate || query.endDate
+        ? `${query.startDate || "Awal"} s/d ${query.endDate || "Sekarang"}`
+        : "Semua Rentang Waktu";
+    const filterStatusStr =
+      query.status && query.status !== "ALL" ? query.status : "Semua Status (OFFLINE & RESOLVED)";
+    const filterDeviceTypeStr =
+      query.deviceType && query.deviceType !== "ALL" ? query.deviceType : "Semua Jenis Perangkat";
 
-    res.setHeader("Content-Disposition", 'attachment; filename="events_alarms.csv"');
+    const lines = [];
+
+    // Header metadata report
+    lines.push("# ==============================================================================");
+    lines.push("# LAPORAN REKAPITULASI CCTV & AUDIO PAGING SERTA LOG EVENT ALARM");
+    lines.push(`# Waktu Unduh Laporan : ${nowWib}`);
+    lines.push(`# Filter Rentang Waktu: ${filterRangeStr}`);
+    lines.push(`# Filter Status       : ${filterStatusStr}`);
+    lines.push(`# Filter Perangkat    : ${filterDeviceTypeStr}`);
+    lines.push("# ==============================================================================");
+    lines.push("");
+
+    // BAGIAN 1: REKAPITULASI CCTV
+    lines.push("# ------------------------------------------------------------------------------");
+    lines.push("# BAGIAN 1: REKAPITULASI CCTV");
+    lines.push("# ------------------------------------------------------------------------------");
+    lines.push(["Metrik CCTV", "Persentase"].map(escapeCsv).join(","));
+    lines.push(
+      ["Rata-rata CCTV Online", `${recap.cctv.onlinePercent}%`].map(escapeCsv).join(","),
+    );
+    lines.push(
+      ["Rata-rata CCTV Offline", `${recap.cctv.offlinePercent}%`].map(escapeCsv).join(","),
+    );
+    lines.push("");
+
+    // BAGIAN 2: REKAPITULASI AUDIO PTT
+    lines.push("# ------------------------------------------------------------------------------");
+    lines.push("# BAGIAN 2: REKAPITULASI AUDIO PTT");
+    lines.push("# ------------------------------------------------------------------------------");
+    lines.push(["Metrik Audio PTT", "Nilai"].map(escapeCsv).join(","));
+    lines.push(["Total PTT", recap.audio.totalPtt].map(escapeCsv).join(","));
+    lines.push(["Total Sesi", `${recap.audio.totalSessions} Sesi`].map(escapeCsv).join(","));
+    lines.push("");
+
+    // BAGIAN 3: DAFTAR RINCIAN INSIDEN EVENT & ALARM
+    lines.push("# ------------------------------------------------------------------------------");
+    lines.push("# BAGIAN 3: DAFTAR RINCIAN LOG INSIDEN EVENT & ALARM");
+    lines.push("# ------------------------------------------------------------------------------");
+    const headers = [
+      "ID Insiden",
+      "Waktu Kejadian (WIB)",
+      "Status",
+      "Tingkat Keparahan",
+      "Tipe Perangkat",
+      "Tipe Event",
+      "Judul Insiden",
+      "Pesan Insiden",
+      "ID Kamera",
+      "ID Audio Speaker",
+      "Lokasi Site",
+      "Zona Area",
+      "Di-Acknowledge Oleh",
+      "Diselesaikan Oleh",
+      "Waktu Pemulihan (WIB)",
+      "Catatan Resolusi",
+    ];
+    lines.push(headers.map(escapeCsv).join(","));
+
+    for (const e of events) {
+      const deviceType = e.cameraId ? "Kamera CCTV" : e.audioDeviceId ? "Audio Speaker" : "Perangkat Lain";
+      lines.push(
+        [
+          escapeCsv(e.id),
+          escapeCsv(formatWib(e.occurredAt)),
+          escapeCsv(e.status),
+          escapeCsv(e.severity),
+          escapeCsv(deviceType),
+          escapeCsv(e.type),
+          escapeCsv(e.title),
+          escapeCsv(e.message),
+          escapeCsv(e.cameraId || "-"),
+          escapeCsv(e.audioDeviceId || "-"),
+          escapeCsv(e.siteName || "-"),
+          escapeCsv(e.zoneName || "-"),
+          escapeCsv(e.acknowledgedByName || "-"),
+          escapeCsv(e.resolvedByName || "-"),
+          escapeCsv(e.resolvedAt ? formatWib(e.resolvedAt) : "-"),
+          escapeCsv(e.resolutionNote || "-"),
+        ].join(","),
+      );
+    }
+
+    const csvContent = "\uFEFF" + lines.join("\r\n");
+
+    res.setHeader("Content-Disposition", 'attachment; filename="laporan_event_alarm_rekapitulasi.csv"');
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     return res.send(csvContent);
   } catch (err) {

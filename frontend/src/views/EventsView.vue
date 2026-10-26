@@ -13,7 +13,7 @@
           </span> -->
         </div>
         <p class="text-xs text-slate-400 mt-1 font-mono">
-          Monitoring khusus deteksi perangkat OFFLINE dan riwayat pemulihan koneksi (RESOLVED).
+          Monitoring deteksi perangkat OFFLINE, rekapitulasi operasional CCTV & audio paging, serta audit pemulihan koneksi.
         </p>
       </div>
 
@@ -32,64 +32,118 @@
         <Button
           variant="secondary"
           size="sm"
+          class="hover:border-blue-500/50"
+          title="Unduh laporan ekspor CSV lengkap (Rekapitulasi CCTV, Audio Paging, dan Rincian Log Insiden)"
           @click="handleExport('csv')"
         >
-          <Download class="w-3.5 h-3.5 mr-1.5" />
-          Ekspor CSV
+          <Download class="w-3.5 h-3.5 mr-1.5 text-blue-400" />
+          Ekspor CSV (Rekap & Log)
         </Button>
       </div>
     </div>
 
-    <!-- Metric Summary Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
-      <!-- Card 1: Total Insiden -->
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between shadow-xs">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block tracking-wider">Total Insiden:</span>
-          <p class="text-xl font-bold text-slate-100">{{ eventsStore.stats.total }}</p>
-          <span class="text-[10px] text-slate-500 block mt-0.5">Histori OFFLINE & RESOLVED</span>
+    <!-- REKAPITULASI CCTV & AUDIO PTT -->
+    <div class="bg-[#0d131f] border border-[#1e2a3b] rounded-xl p-3.5 font-mono text-xs shadow-xs">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-[#1e2a3b]">
+        <!-- Rekapitulasi CCTV: Persentase Online & Offline -->
+        <div class="flex items-center justify-between pr-0 md:pr-6">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0">
+              <Video class="w-4 h-4" />
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Rekap CCTV</span>
+              <span class="text-[11px] text-slate-300">Rata-rata Status Koneksi</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 block">Rata-rata Online:</span>
+              <span class="text-base font-bold text-emerald-400">{{ cctvRecap.onlinePercent }}%</span>
+            </div>
+            <div class="h-7 w-px bg-[#1e2a3b]"></div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 block">Rata-rata Offline:</span>
+              <span class="text-base font-bold text-rose-400">{{ cctvRecap.offlinePercent }}%</span>
+            </div>
+          </div>
         </div>
-        <div class="w-9 h-9 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
-          <BellRing class="w-4 h-4" />
+
+        <!-- Rekapitulasi Audio PTT: Total PTT & Sesi -->
+        <div class="flex items-center justify-between pt-3 md:pt-0 pl-0 md:pl-6">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shrink-0">
+              <Megaphone class="w-4 h-4" />
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Rekap Audio PTT</span>
+              <span class="text-[11px] text-slate-300">Aktivitas Siaran Suara</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 block">Total PTT:</span>
+              <span class="text-base font-bold text-indigo-300">{{ audioRecap.totalPtt }}</span>
+            </div>
+            <div class="h-7 w-px bg-[#1e2a3b]"></div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 block">Total Sesi:</span>
+              <span class="text-base font-bold text-purple-400">{{ audioRecap.totalSessions }} Sesi</span>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <!-- Card 2: Perangkat OFFLINE Aktif -->
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between shadow-xs relative overflow-hidden">
-        <div v-if="eventsStore.stats.offlineActiveCount > 0" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></div>
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block tracking-wider">Perangkat OFFLINE Aktif:</span>
-          <p class="text-xl font-bold text-rose-400">{{ eventsStore.stats.offlineActiveCount }}</p>
-          <span class="text-[10px] text-rose-500/80 block mt-0.5">Perangkat terputus & butuh atensi</span>
+    <!-- STATISTIK OPERASIONAL: TOTAL EVENT & PERANGKAT OFFLINE -->
+    <div class="bg-[#0d131f] border border-[#1e2a3b] rounded-xl p-3.5 font-mono text-xs shadow-xs">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-[#1e2a3b]">
+        <!-- Kolom 1: Total Event & Status Pemulihan -->
+        <div class="flex items-center justify-between pr-0 md:pr-6">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+              <BellRing class="w-4 h-4" />
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Total Event & Alarm</span>
+              <span class="text-[11px] text-slate-300">Histori Insiden Terdeteksi</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 block">Total Event:</span>
+              <span class="text-base font-bold text-slate-100">{{ eventsStore.stats.total }}</span>
+            </div>
+            <div class="h-7 w-px bg-[#1e2a3b]"></div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 block">Pulih (Resolved):</span>
+              <span class="text-base font-bold text-emerald-400">{{ eventsStore.stats.resolvedCount }}</span>
+            </div>
+          </div>
         </div>
-        <div class="w-9 h-9 rounded-lg bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400">
-          <AlertOctagon class="w-4 h-4" />
-        </div>
-      </div>
 
-      <!-- Card 3: Insiden Selesai / Pulih -->
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between shadow-xs">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block tracking-wider">Insiden Pulih (RESOLVED):</span>
-          <p class="text-xl font-bold text-emerald-400">{{ eventsStore.stats.resolvedCount }}</p>
-          <span class="text-[10px] text-emerald-500/80 block mt-0.5">Auto-recover / tindakan operator</span>
-        </div>
-        <div class="w-9 h-9 rounded-lg bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-          <CheckCircle2 class="w-4 h-4" />
-        </div>
-      </div>
-
-      <!-- Card 4: Distribusi Perangkat Terdampak -->
-      <div class="p-3 bg-[#0d131f] border border-[#1e2a3b] rounded-xl flex items-center justify-between shadow-xs">
-        <div>
-          <span class="text-[10px] text-slate-400 uppercase block tracking-wider">Perangkat Terdampak:</span>
-          <p class="text-sm font-bold text-indigo-300 mt-1">
-            CAM: {{ eventsStore.stats.cameraCount }} • AUD: {{ eventsStore.stats.audioCount }}
-          </p>
-          <span class="text-[10px] text-slate-500 block mt-0.5">Distribusi kamera & speaker</span>
-        </div>
-        <div class="w-9 h-9 rounded-lg bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400">
-          <Layers class="w-4 h-4" />
+        <!-- Kolom 2: Kamera Offline & Audio Offline -->
+        <div class="flex items-center justify-between pt-3 md:pt-0 pl-0 md:pl-6">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+              <AlertTriangle class="w-4 h-4" />
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Perangkat OFFLINE</span>
+              <span class="text-[11px] text-slate-300">Status Terputus Saat Ini</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 block">Kamera Offline:</span>
+              <span class="text-base font-bold text-rose-400">{{ eventsStore.stats.cameraOfflineCount }}</span>
+            </div>
+            <div class="h-7 w-px bg-[#1e2a3b]"></div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 block">Audio Offline:</span>
+              <span class="text-base font-bold" :class="eventsStore.stats.audioOfflineCount > 0 ? 'text-rose-400' : 'text-slate-400'">{{ eventsStore.stats.audioOfflineCount }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -641,6 +695,24 @@ function formatJson(val) {
   }
 }
 
+const cctvRecap = computed(() => {
+  return (
+    eventsStore.stats.recap?.cctv || {
+      onlinePercent: 100,
+      offlinePercent: 0
+    }
+  )
+})
+
+const audioRecap = computed(() => {
+  return (
+    eventsStore.stats.recap?.audio || {
+      totalPtt: 0,
+      totalSessions: 0
+    }
+  )
+})
+
 async function loadEvents() {
   await eventsStore.fetchEvents(filters)
 }
@@ -648,14 +720,16 @@ async function loadEvents() {
 async function loadAllData() {
   await Promise.all([
     eventsStore.fetchStats(),
+    eventsStore.fetchRecap(filters),
     eventsStore.fetchEvents(filters)
   ])
-  toast.success('Event & Alarm Dimuat', 'Data rekaman insiden dan metrik berhasil disegarkan.')
+  toast.success('Event & Alarm Dimuat', 'Data rekaman insiden dan rekapitulasi berhasil disegarkan.')
 }
 
 function applyFilters() {
   filters.page = 1
   loadEvents()
+  eventsStore.fetchRecap(filters)
 }
 
 function resetFilters() {
@@ -666,6 +740,7 @@ function resetFilters() {
   filters.endDate = ''
   filters.page = 1
   loadEvents()
+  eventsStore.fetchRecap(filters)
 }
 
 function changePage(newPage) {
@@ -706,7 +781,7 @@ async function confirmResolveEvent() {
 
 function handleExport(format = 'csv') {
   eventsStore.downloadExport(filters, format)
-  toast.info('Mengunduh Log', `Sedang mengunduh berkas event format ${format.toUpperCase()}...`)
+  toast.info('Mengunduh Laporan', `Sedang mengunduh laporan rekapitulasi CCTV, audio paging, dan log insiden (${format.toUpperCase()})...`)
 }
 
 onMounted(() => {

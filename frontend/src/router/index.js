@@ -9,7 +9,6 @@ import CctvView from '../views/CctvView.vue'
 import AudioPagingView from '../views/AudioPagingView.vue'
 import AudioSchedulerView from '../views/AudioSchedulerView.vue'
 import EventsView from '../views/EventsView.vue'
-import ReportsView from '../views/ReportsView.vue'
 import DevicesView from '../views/DevicesView.vue'
 import SitesZonesView from '../views/SitesZonesView.vue'
 import UsersView from '../views/UsersView.vue'
@@ -72,9 +71,7 @@ const routes = [
       },
       {
         path: 'reports',
-        name: 'reports',
-        component: ReportsView,
-        meta: { title: 'Laporan & Statistik' }
+        redirect: '/events'
       },
       // Admin Only Views
       {

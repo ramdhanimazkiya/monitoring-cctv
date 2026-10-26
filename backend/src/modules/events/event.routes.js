@@ -10,6 +10,7 @@ const router = Router();
 router.use(requireAuth, requireRole("ADMIN", "OPERATOR"));
 
 router.get("/stats", eventController.getStats);
+router.get("/recap", validateQuery(eventQuerySchema), eventController.getRecap);
 router.get("/export", validateQuery(eventQuerySchema), eventController.exportEvents);
 router.get("/:id", eventController.getEvent);
 router.patch("/:id/acknowledge", eventController.acknowledge);

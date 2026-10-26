@@ -206,7 +206,6 @@ import {
   Video,
   Megaphone,
   BellRing,
-  FileBarChart,
   Server,
   MapPin,
   Users,
@@ -256,8 +255,7 @@ const operatorNav = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { label: 'CCTV Monitoring', path: '/cctv', icon: Video, badge: 'GRID & MAP' },
   { label: 'Audio Paging', path: '/audio-paging', icon: Megaphone },
-  { label: 'Event & Alarm', path: '/events', icon: BellRing },
-  { label: 'Reports', path: '/reports', icon: FileBarChart },
+  { label: 'Event & Alarm', path: '/events', icon: BellRing }
 ]
 
 const adminNav = [

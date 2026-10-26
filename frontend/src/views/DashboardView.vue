@@ -10,97 +10,158 @@
       </p>
     </div>
 
-    <!-- 4 Key Monitoring Metric Cards (Super Minimalist & Elegant) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-      <!-- Card 1: CCTV Cameras -->
-      <div class="p-3.5 rounded-xl bg-[#0d121d] border border-[#232f42] hover:border-blue-500/40 transition-colors group">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-medium">CCTV Cameras</span>
-          <Video class="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-400 transition-colors" />
-        </div>
-        <div class="mt-2 flex items-baseline gap-1.5">
-          <span class="text-2xl font-bold font-mono text-slate-100 tracking-tight">{{ stats.cctv.total }}</span>
-          <span class="text-[11px] text-slate-500 font-mono">unit</span>
-        </div>
-        <div class="mt-2.5 flex items-center gap-3 text-[11px] font-mono">
-          <span class="flex items-center gap-1.5 text-emerald-400" title="Online">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            {{ stats.cctv.online }}
-          </span>
-          <span class="flex items-center gap-1.5 text-rose-400" title="Offline">
-            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-            {{ stats.cctv.offline }}
-          </span>
-          <span v-if="stats.cctv.unknown" class="flex items-center gap-1.5 text-slate-400" title="Unknown / Belum diperiksa">
-            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-            {{ stats.cctv.unknown }}
-          </span>
+    <!-- METRIK OPERASI MONITORING: CCTV, AUDIO, EVENT & ALARM, SITE & ZONE -->
+    <div class="space-y-3">
+      <!-- Rekap CCTV & Audio -->
+      <div class="bg-[#0d131f] hover:bg-[#0f1726] border border-[#1e2a3b] hover:border-[#28384f] rounded-xl p-3.5 font-mono text-xs shadow-xs transition-all duration-200">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-[#1e2a3b]">
+          <!-- Kolom 1: Kamera CCTV -->
+          <div class="flex items-center justify-between pr-0 md:pr-6 group">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0 group-hover:bg-blue-500/30 group-hover:border-blue-400/60 group-hover:text-blue-300 transition-all duration-200">
+                <Video class="w-4 h-4" />
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 uppercase tracking-wider block font-bold group-hover:text-slate-200 transition-colors duration-200">Kamera CCTV</span>
+                <span class="text-[11px] text-slate-300">Total: <strong class="text-slate-100 font-bold">{{ stats.cctv.total }}</strong> Unit Kamera</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block">Online:</span>
+                <span class="text-base font-bold text-emerald-400 flex items-center justify-end gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  {{ stats.cctv.online }}
+                </span>
+              </div>
+              <div class="h-7 w-px bg-[#1e2a3b]"></div>
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block">Offline:</span>
+                <span class="text-base font-bold text-rose-400 flex items-center justify-end gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                  {{ stats.cctv.offline }}
+                </span>
+              </div>
+              <template v-if="stats.cctv.unknown">
+                <div class="h-7 w-px bg-[#1e2a3b]"></div>
+                <div class="text-right">
+                  <span class="text-[10px] text-slate-400 block">Unknown:</span>
+                  <span class="text-base font-bold text-slate-400 flex items-center justify-end gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                    {{ stats.cctv.unknown }}
+                  </span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Kolom 2: Audio Speakers -->
+          <div class="flex items-center justify-between pt-3 md:pt-0 pl-0 md:pl-6 group">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shrink-0 group-hover:bg-purple-500/30 group-hover:border-purple-400/60 group-hover:text-purple-300 transition-all duration-200">
+                <Volume2 class="w-4 h-4" />
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 uppercase tracking-wider block font-bold group-hover:text-slate-200 transition-colors duration-200">Audio Speaker</span>
+                <span class="text-[11px] text-slate-300">Total: <strong class="text-slate-100 font-bold">{{ stats.audio.total }}</strong> Unit Speaker</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block">Online:</span>
+                <span class="text-base font-bold text-emerald-400 flex items-center justify-end gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  {{ stats.audio.online }}
+                </span>
+              </div>
+              <div class="h-7 w-px bg-[#1e2a3b]"></div>
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block">Offline:</span>
+                <span class="text-base font-bold text-rose-400 flex items-center justify-end gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                  {{ stats.audio.offline }}
+                </span>
+              </div>
+              <template v-if="stats.audio.unknown">
+                <div class="h-7 w-px bg-[#1e2a3b]"></div>
+                <div class="text-right">
+                  <span class="text-[10px] text-slate-400 block">Unknown:</span>
+                  <span class="text-base font-bold text-slate-400 flex items-center justify-end gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                    {{ stats.audio.unknown }}
+                  </span>
+                </div>
+              </template>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Card 2: Audio Speakers -->
-      <div class="p-3.5 rounded-xl bg-[#0d121d] border border-[#232f42] hover:border-purple-500/40 transition-colors group">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-medium">Audio Speakers</span>
-          <Volume2 class="w-3.5 h-3.5 text-slate-400 group-hover:text-purple-400 transition-colors" />
-        </div>
-        <div class="mt-2 flex items-baseline gap-1.5">
-          <span class="text-2xl font-bold font-mono text-slate-100 tracking-tight">{{ stats.audio.total }}</span>
-          <span class="text-[11px] text-slate-500 font-mono">unit</span>
-        </div>
-        <div class="mt-2.5 flex items-center gap-3 text-[11px] font-mono">
-          <span class="flex items-center gap-1.5 text-emerald-400" title="Online">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            {{ stats.audio.online }}
-          </span>
-          <span class="flex items-center gap-1.5 text-rose-400" title="Offline">
-            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-            {{ stats.audio.offline }}
-          </span>
-          <span v-if="stats.audio.unknown" class="flex items-center gap-1.5 text-slate-400" title="Unknown / Belum diperiksa">
-            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-            {{ stats.audio.unknown }}
-          </span>
-        </div>
-      </div>
+      <!-- Rekap Event & Alarm serta Site & Zone -->
+      <div class="bg-[#0d131f] hover:bg-[#0f1726] border border-[#1e2a3b] hover:border-[#28384f] rounded-xl p-3.5 font-mono text-xs shadow-xs transition-all duration-200">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-[#1e2a3b]">
+          <!-- Kolom 1: Event & Alarm -->
+          <div class="flex items-center justify-between pr-0 md:pr-6 group">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0 group-hover:bg-rose-500/30 group-hover:border-rose-400/60 group-hover:text-rose-300 transition-all duration-200">
+                <AlertTriangle class="w-4 h-4" />
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 uppercase tracking-wider block font-bold group-hover:text-slate-200 transition-colors duration-200">Event & Alarm</span>
+                <span class="text-[11px] text-slate-300">Histori {{ eventsStore.stats.total }} Insiden Tercatat</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block">Aktif (Kritis):</span>
+                <span class="text-base font-bold text-rose-400 flex items-center justify-end gap-1.5">
+                  <span
+                    class="w-1.5 h-1.5 rounded-full bg-rose-400"
+                    :class="{ 'animate-ping': eventsStore.stats.offlineActiveCount > 0 }"
+                  ></span>
+                  {{ eventsStore.stats.offlineActiveCount }}
+                </span>
+              </div>
+              <div class="h-7 w-px bg-[#1e2a3b]"></div>
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block">Pulih (Resolved):</span>
+                <span class="text-base font-bold text-emerald-400 flex items-center justify-end gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  {{ eventsStore.stats.resolvedCount }}
+                </span>
+              </div>
+            </div>
+          </div>
 
-      <!-- Card 3: Alarm & Insiden -->
-      <div class="p-3.5 rounded-xl bg-[#0d121d] border border-[#232f42] hover:border-rose-500/40 transition-colors group">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-medium">Alarm & Insiden</span>
-          <AlertTriangle class="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-400 transition-colors" />
-        </div>
-        <div class="mt-2 flex items-baseline gap-1.5">
-          <span class="text-2xl font-bold font-mono text-slate-100 tracking-tight">{{ eventsStore.stats.offlineActiveCount }}</span>
-          <span class="text-[11px] text-slate-500 font-mono">aktif</span>
-        </div>
-        <div class="mt-2.5 flex items-center gap-3 text-[11px] font-mono">
-          <span class="flex items-center gap-1.5 text-rose-400">
-            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-            {{ eventsStore.stats.offlineActiveCount }} kritis
-          </span>
-          <span class="flex items-center gap-1.5 text-emerald-400">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            {{ eventsStore.stats.resolvedCount }} pulih
-          </span>
-        </div>
-      </div>
-
-      <!-- Card 4: Lokasi & Zona -->
-      <div class="p-3.5 rounded-xl bg-[#0d121d] border border-[#232f42] hover:border-amber-500/40 transition-colors group">
-        <div class="flex items-center justify-between">
-          <span class="text-[11px] font-mono uppercase tracking-wider text-slate-400 font-medium">Lokasi & Zona</span>
-          <MapPin class="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-400 transition-colors" />
-        </div>
-        <div class="mt-2 flex items-baseline gap-1.5">
-          <span class="text-2xl font-bold font-mono text-slate-100 tracking-tight">{{ cctvStore.sites.length }}</span>
-          <span class="text-[11px] text-slate-500 font-mono">site</span>
-        </div>
-        <div class="mt-2.5 flex items-center gap-3 text-[11px] font-mono">
-          <span class="flex items-center gap-1.5 text-slate-300">
-            <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-            {{ cctvStore.zones.length }} zona
-          </span>
+          <!-- Kolom 2: Site & Zone -->
+          <div class="flex items-center justify-between pt-3 md:pt-0 pl-0 md:pl-6 group">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 group-hover:bg-amber-500/30 group-hover:border-amber-400/60 group-hover:text-amber-300 transition-all duration-200">
+                <MapPin class="w-4 h-4" />
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 uppercase tracking-wider block font-bold group-hover:text-slate-200 transition-colors duration-200">Site & Zone</span>
+                <span class="text-[11px] text-slate-300">Hierarki Fasilitas & Area</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block">Total Site:</span>
+                <span class="text-base font-bold text-amber-400 flex items-center justify-end gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                  {{ cctvStore.sites.length }} Site
+                </span>
+              </div>
+              <div class="h-7 w-px bg-[#1e2a3b]"></div>
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block">Total Zona:</span>
+                <span class="text-base font-bold text-indigo-400 flex items-center justify-end gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                  {{ cctvStore.zones.length }} Zona
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -277,7 +338,7 @@
           </div>
 
           <!-- Emergency Lock Status Banner -->
-          <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#180f1a] border border-rose-900/40 text-xs font-mono">
+          <!-- <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#180f1a] border border-rose-900/40 text-xs font-mono">
             <div class="flex items-center gap-2 text-rose-300">
               <Lock class="w-3.5 h-3.5 text-rose-400 shrink-0 animate-pulse" />
               <div class="text-[11px]">
@@ -289,7 +350,7 @@
             <span class="text-[10px] font-mono text-slate-400 shrink-0">
               16 kHz Mono
             </span>
-          </div>
+          </div> -->
 
           <!-- Emergency Trigger Button -->
           <button
@@ -556,6 +617,7 @@ import {
   Volume2,
   AlertTriangle,
   MapPin,
+  Layers,
   Eye,
   CheckSquare,
   CheckCircle2,

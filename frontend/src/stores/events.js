@@ -20,7 +20,19 @@ export const useEventsStore = defineStore('events', () => {
     offlineActiveCount: 0,
     resolvedCount: 0,
     cameraCount: 0,
-    audioCount: 0
+    audioCount: 0,
+    cameraOfflineCount: 0,
+    audioOfflineCount: 0,
+    recap: {
+      cctv: {
+        onlinePercent: 100,
+        offlinePercent: 0
+      },
+      audio: {
+        totalPtt: 0,
+        totalSessions: 0
+      }
+    }
   })
 
   const selectedEvent = ref(null)
@@ -39,6 +51,11 @@ export const useEventsStore = defineStore('events', () => {
         stats.resolvedCount = body.data.resolvedCount || 0
         stats.cameraCount = body.data.cameraCount || 0
         stats.audioCount = body.data.audioCount || 0
+        stats.cameraOfflineCount = body.data.cameraOfflineCount || 0
+        stats.audioOfflineCount = body.data.audioOfflineCount || 0
+        if (body.data.recap) {
+          stats.recap = body.data.recap
+        }
       }
     } catch (err) {
       console.error('fetchStats events error:', err)
@@ -176,6 +193,25 @@ export const useEventsStore = defineStore('events', () => {
     window.open(url, '_blank')
   }
 
+  async function fetchRecap(query = {}) {
+    try {
+      const searchParams = new URLSearchParams()
+      if (query.startDate) searchParams.set('startDate', query.startDate)
+      if (query.endDate) searchParams.set('endDate', query.endDate)
+      const res = await fetch(`/api/events/recap?${searchParams.toString()}`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'include'
+      })
+      const body = await res.json()
+      if (body.success && body.data) {
+        stats.recap = body.data
+        return body.data
+      }
+    } catch (err) {
+      console.error('fetchRecap error:', err)
+    }
+  }
+
   const recentNotifications = ref([])
   const notificationsLoading = ref(false)
 
@@ -209,6 +245,7 @@ export const useEventsStore = defineStore('events', () => {
     stats,
     selectedEvent,
     fetchStats,
+    fetchRecap,
     fetchEvents,
     fetchRecentNotifications,
     fetchEventById,
