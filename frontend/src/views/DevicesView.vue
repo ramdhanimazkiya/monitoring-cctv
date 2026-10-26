@@ -65,9 +65,23 @@
       </template>
 
       <template #zone="{ row }">
-        <span class="text-xs font-mono text-slate-300">
-          {{ row.zone?.name || row.zoneName || '-' }} <span class="text-slate-500 text-[10px]">({{ row.site?.name || row.siteName || '-' }})</span>
-        </span>
+        <div class="text-xs font-mono">
+          <span
+            v-if="row.zoneId && isZoneActive(row.zoneId, row)"
+            class="text-slate-200 font-medium"
+          >
+            {{ getZoneName(row) }}
+          </span>
+          <span
+            v-else
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-950/70 text-amber-300 border border-amber-800/80"
+          >
+            Unassigned
+          </span>
+          <span class="text-slate-500 text-[10px] block">
+            ({{ row.site?.name || row.siteName || '-' }})
+          </span>
+        </div>
       </template>
 
       <template #streamUrl="{ row }">
@@ -161,17 +175,25 @@
         </div>
       </template>
 
-      <!-- Pagination 5 item per halaman -->
+      <!-- Table Pagination Footer (Sama seperti Event & Alarm, Default 5 Data) -->
       <template #footer>
         <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-400">
-          <div>
-            <span>Menampilkan </span>
-            <strong class="text-slate-200">
-              {{ cctvStore.cameras.length === 0 ? 0 : (cctvPage - 1) * pageSize + 1 }} - {{ Math.min(cctvPage * pageSize, cctvStore.cameras.length) }}
-            </strong>
-            <span> dari </span>
-            <strong class="text-slate-200">{{ cctvStore.cameras.length }}</strong>
-            <span> kamera (5 item/halaman)</span>
+          <div class="flex items-center gap-2">
+            <span>Baris per halaman:</span>
+            <select
+              v-model="cctvPageSize"
+              class="bg-[#151f33] border border-[#283548] text-slate-200 rounded px-2 py-0.5 cursor-pointer focus:outline-none"
+              @change="cctvPage = 1"
+            >
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+            <!-- <span class="text-slate-500 hidden sm:inline">
+              (Menampilkan {{ cctvStore.cameras.length === 0 ? 0 : (cctvPage - 1) * cctvPageSize + 1 }} - {{ Math.min(cctvPage * cctvPageSize, cctvStore.cameras.length) }} dari {{ cctvStore.cameras.length }} kamera)
+            </span> -->
           </div>
 
           <div class="flex items-center gap-1.5">
@@ -231,6 +253,26 @@
         <div class="flex items-center gap-1.5 font-mono">
           <span class="font-bold text-purple-400">{{ row.id }}</span>
           <span class="text-[10px] text-slate-500" title="ID dibuat otomatis oleh database (Immutable)"></span>
+        </div>
+      </template>
+
+      <template #zoneName="{ row }">
+        <div class="text-xs font-mono">
+          <span
+            v-if="row.zoneId && isZoneActive(row.zoneId, row)"
+            class="text-slate-200 font-medium"
+          >
+            {{ getAudioZoneName(row) }}
+          </span>
+          <span
+            v-else
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-950/70 text-amber-300 border border-amber-800/80"
+          >
+            Unassigned
+          </span>
+          <span class="text-slate-500 text-[10px] block">
+            ({{ row.site?.name || row.siteName || '-' }})
+          </span>
         </div>
       </template>
 
@@ -318,17 +360,25 @@
         </div>
       </template>
 
-      <!-- Pagination 5 item per halaman -->
+      <!-- Table Pagination Footer (Sama seperti Event & Alarm, Default 5 Data) -->
       <template #footer>
         <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-400">
-          <div>
-            <span>Menampilkan </span>
-            <strong class="text-slate-200">
-              {{ audioStore.activeDevices.length === 0 ? 0 : (speakerPage - 1) * pageSize + 1 }} - {{ Math.min(speakerPage * pageSize, audioStore.activeDevices.length) }}
-            </strong>
-            <span> dari </span>
-            <strong class="text-slate-200">{{ audioStore.activeDevices.length }}</strong>
-            <span> speaker (5 item/halaman)</span>
+          <div class="flex items-center gap-2">
+            <span>Baris per halaman:</span>
+            <select
+              v-model="speakerPageSize"
+              class="bg-[#151f33] border border-[#283548] text-slate-200 rounded px-2 py-0.5 cursor-pointer focus:outline-none"
+              @change="speakerPage = 1"
+            >
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+            <!-- <span class="text-slate-500 hidden sm:inline">
+              (Menampilkan {{ audioStore.activeDevices.length === 0 ? 0 : (speakerPage - 1) * speakerPageSize + 1 }} - {{ Math.min(speakerPage * speakerPageSize, audioStore.activeDevices.length) }} dari {{ audioStore.activeDevices.length }} speaker)
+            </span> -->
           </div>
 
           <div class="flex items-center gap-1.5">
@@ -374,12 +424,21 @@
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input v-model="activeCctv.name" label="Nama Kamera" placeholder="Kamera Lobby Utama" required />
+          <Input
+            v-model="activeCctv.name"
+            label="Nama Kamera"
+            placeholder="Kamera Lobby Utama"
+            required
+            :error="cctvErrors.name"
+            @input="cctvErrors.name = ''"
+          />
           <Select
             v-model="activeCctv.siteId"
             label="Lokasi Site"
             :placeholder="cctvStore.sites.length ? '-- Pilih Lokasi Site --' : '-- Belum Ada Site Terdaftar --'"
             :options="siteOptions"
+            :error="cctvErrors.siteId"
+            @change="cctvErrors.siteId = ''"
             required
           />
         </div>
@@ -397,7 +456,7 @@
         <!-- Stream URL Input -->
         <div class="p-3.5 rounded-lg bg-[#0d121e] border border-[#283548] space-y-2">
           <label class="text-xs font-semibold text-emerald-400 font-mono uppercase tracking-wide block">
-            URL Stream Kamera:
+            URL Stream Kamera: <span class="text-rose-400">*</span>
           </label>
 
           <div class="flex gap-2">
@@ -405,8 +464,12 @@
               v-model="activeCctv.streamUrl"
               type="text"
               placeholder="https://stream.example.com/ atau rtsp://..."
-              class="flex-1 bg-[#111827] border border-[#283548] rounded-md px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              :class="[
+                'flex-1 bg-[#111827] border rounded-md px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
+                cctvErrors.streamUrl || cctvUrlDuplicateWarning ? 'border-rose-500 focus:ring-rose-500 text-rose-200' : 'border-[#283548] focus:ring-emerald-500'
+              ]"
               required
+              @input="cctvErrors.streamUrl = ''"
             />
             <Button
               type="button"
@@ -417,6 +480,23 @@
             >
               Uji URL
             </Button>
+          </div>
+          <span v-if="cctvErrors.streamUrl" class="text-[10px] text-rose-400 font-mono mt-1 block">
+            ⚠ {{ cctvErrors.streamUrl }}
+          </span>
+          <span v-else class="text-[10px] text-slate-500 font-mono mt-1 block">
+            Format: http://, https://, rtsp://, rtsps://, atau ws(s)://
+          </span>
+
+          <!-- Alert jika URL stream kamera telah ada -->
+          <div
+            v-if="cctvUrlDuplicateWarning"
+            class="p-2.5 rounded bg-rose-950/80 border border-rose-600/70 text-rose-300 text-xs font-mono flex items-start gap-2"
+          >
+            <AlertCircle class="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+            <div>
+              <strong class="font-bold">Peringatan:</strong> URL stream ini sudah terdaftar pada kamera <strong>{{ cctvUrlDuplicateWarning.id }} - {{ cctvUrlDuplicateWarning.name }}</strong>. Harap gunakan URL stream yang berbeda.
+            </div>
           </div>
         </div>
 
@@ -434,8 +514,15 @@
                 type="number"
                 step="0.000001"
                 placeholder="Contoh: -6.917464"
-                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                :class="[
+                  'w-full bg-[#0a0e17] border rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
+                  cctvErrors.latitude ? 'border-rose-500 focus:ring-rose-500' : 'border-[#283548] focus:ring-blue-500'
+                ]"
+                @input="cctvErrors.latitude = ''"
               />
+              <span v-if="cctvErrors.latitude" class="text-[10px] text-rose-400 font-mono mt-1 block">
+                ⚠ {{ cctvErrors.latitude }}
+              </span>
             </div>
             <div>
               <label class="text-[10px] font-mono text-slate-400 block mb-1">Longitude:</label>
@@ -444,8 +531,15 @@
                 type="number"
                 step="0.000001"
                 placeholder="Contoh: 107.619122"
-                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                :class="[
+                  'w-full bg-[#0a0e17] border rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
+                  cctvErrors.longitude ? 'border-rose-500 focus:ring-rose-500' : 'border-[#283548] focus:ring-blue-500'
+                ]"
+                @input="cctvErrors.longitude = ''"
               />
+              <span v-if="cctvErrors.longitude" class="text-[10px] text-rose-400 font-mono mt-1 block">
+                ⚠ {{ cctvErrors.longitude }}
+              </span>
             </div>
           </div>
         </div>
@@ -479,6 +573,8 @@
           label="Nama Speaker Audio"
           placeholder="Speaker Koridor Timur, Horn Parkir"
           required
+          :error="speakerErrors.name"
+          @input="speakerErrors.name = ''"
         />
 
         <div class="grid grid-cols-2 gap-3">
@@ -487,6 +583,9 @@
             label="Lokasi Site"
             :placeholder="cctvStore.sites.length ? '-- Pilih Lokasi Site --' : '-- Belum Ada Site Terdaftar --'"
             :options="siteOptions"
+            :error="speakerErrors.siteId"
+            @change="speakerErrors.siteId = ''"
+            required
           />
           <Select
             v-model="activeSpeaker.zoneId"
@@ -497,14 +596,18 @@
         </div>
 
         <div>
-          <label class="text-xs font-medium text-slate-300 block mb-1">Gateway WHIP Ingestion Endpoint URL:</label>
+          <label class="text-xs font-medium text-slate-300 block mb-1">Gateway WHIP Ingestion Endpoint URL: <span class="text-rose-400">*</span></label>
           <div class="flex gap-2">
             <input
               v-model="activeSpeaker.whipUrl"
               type="text"
               placeholder="https://stream.example.com/audio-raw/whip"
-              class="flex-1 bg-[#111827] border border-[#283548] rounded-md px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              :class="[
+                'flex-1 bg-[#111827] border rounded-md px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
+                speakerErrors.whipUrl || audioUrlDuplicateWarning ? 'border-rose-500 focus:ring-rose-500 text-rose-200' : 'border-[#283548] focus:ring-blue-500'
+              ]"
               required
+              @input="speakerErrors.whipUrl = ''"
             />
             <Button
               type="button"
@@ -516,9 +619,23 @@
               Uji URL
             </Button>
           </div>
-          <span class="text-[10px] text-slate-500 font-mono mt-1 block">
-            Format: HTTPS endpoint MediaMTX WHIP (RFC 9329)
+          <span v-if="speakerErrors.whipUrl" class="text-[10px] text-rose-400 font-mono mt-1 block">
+            ⚠ {{ speakerErrors.whipUrl }}
           </span>
+          <span v-else class="text-[10px] text-slate-500 font-mono mt-1 block">
+            Format: https:// atau http:// endpoint MediaMTX WHIP (RFC 9329)
+          </span>
+
+          <!-- Alert jika URL stream audio WHIP telah ada -->
+          <div
+            v-if="audioUrlDuplicateWarning"
+            class="mt-2 p-2.5 rounded bg-rose-950/80 border border-rose-600/70 text-rose-300 text-xs font-mono flex items-start gap-2"
+          >
+            <AlertCircle class="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+            <div>
+              <strong class="font-bold">Peringatan:</strong> URL stream audio WHIP ini sudah terdaftar pada speaker <strong>{{ audioUrlDuplicateWarning.id }} - {{ audioUrlDuplicateWarning.name }}</strong>. Harap gunakan URL WHIP yang berbeda.
+            </div>
+          </div>
         </div>
 
         <div class="p-3 bg-[#0d121d] border border-[#283548] rounded-lg text-xs font-mono grid grid-cols-2 gap-3">
@@ -546,8 +663,15 @@
                 type="number"
                 step="0.000001"
                 placeholder="Contoh: -6.917464"
-                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                :class="[
+                  'w-full bg-[#0a0e17] border rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
+                  speakerErrors.latitude ? 'border-rose-500 focus:ring-rose-500' : 'border-[#283548] focus:ring-blue-500'
+                ]"
+                @input="speakerErrors.latitude = ''"
               />
+              <span v-if="speakerErrors.latitude" class="text-[10px] text-rose-400 font-mono mt-1 block">
+                ⚠ {{ speakerErrors.latitude }}
+              </span>
             </div>
             <div>
               <label class="text-[10px] font-mono text-slate-400 block mb-1">Longitude:</label>
@@ -556,8 +680,15 @@
                 type="number"
                 step="0.000001"
                 placeholder="Contoh: 107.619122"
-                class="w-full bg-[#0a0e17] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                :class="[
+                  'w-full bg-[#0a0e17] border rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
+                  speakerErrors.longitude ? 'border-rose-500 focus:ring-rose-500' : 'border-[#283548] focus:ring-blue-500'
+                ]"
+                @input="speakerErrors.longitude = ''"
               />
+              <span v-if="speakerErrors.longitude" class="text-[10px] text-rose-400 font-mono mt-1 block">
+                ⚠ {{ speakerErrors.longitude }}
+              </span>
             </div>
           </div>
         </div>
@@ -595,8 +726,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { Radio } from '@lucide/vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { Radio, AlertCircle } from '@lucide/vue'
 import { Table, Badge, Button, Modal, Input, Select, ConfirmationDialog } from '../components/ui/index.js'
 import { useToast } from '../composables/useToast.js'
 import { useAudioDevicesStore } from '../stores/audioDevices.js'
@@ -617,21 +748,82 @@ const modalMode = ref('create')
 const deleteType = ref('AUDIO')
 const toDeleteDevice = ref(null)
 
-// Pagination (5 item per tabel)
-const pageSize = 5
+// Pagination (Identik dengan Event & Alarm, Default 5 Item per Tabel)
 const cctvPage = ref(1)
+const cctvPageSize = ref(5)
 const speakerPage = ref(1)
+const speakerPageSize = ref(5)
 
-const cctvTotalPages = computed(() => Math.ceil(cctvStore.cameras.length / pageSize) || 1)
+const cctvTotalPages = computed(() => Math.ceil(cctvStore.cameras.length / cctvPageSize.value) || 1)
 const paginatedCctvCameras = computed(() => {
-  const start = (cctvPage.value - 1) * pageSize
-  return cctvStore.cameras.slice(start, start + pageSize)
+  const start = (cctvPage.value - 1) * cctvPageSize.value
+  return cctvStore.cameras.slice(start, start + cctvPageSize.value)
 })
 
-const speakerTotalPages = computed(() => Math.ceil(audioStore.activeDevices.length / pageSize) || 1)
+const speakerTotalPages = computed(() => Math.ceil(audioStore.activeDevices.length / speakerPageSize.value) || 1)
 const paginatedAudioDevices = computed(() => {
-  const start = (speakerPage.value - 1) * pageSize
-  return audioStore.activeDevices.slice(start, start + pageSize)
+  const start = (speakerPage.value - 1) * speakerPageSize.value
+  return audioStore.activeDevices.slice(start, start + speakerPageSize.value)
+})
+
+function isZoneActive(zoneId, row = null) {
+  if (!zoneId) return false
+  if (cctvStore.zones.some((z) => z.id === zoneId)) return true
+  if (row?.zone && !row.zone.deletedAt) return true
+  return false
+}
+
+function getZoneName(row) {
+  if (!row.zoneId || !isZoneActive(row.zoneId, row)) return 'Unassigned'
+  const matched = cctvStore.zones.find((z) => z.id === row.zoneId)
+  return matched?.name || row.zone?.name || 'Unassigned'
+}
+
+function getAudioZoneName(row) {
+  if (!row.zoneId || !isZoneActive(row.zoneId, row)) return 'Unassigned'
+  const matched = cctvStore.zones.find((z) => z.id === row.zoneId)
+  return matched?.name || row.zone?.name || row.zoneName || 'Unassigned'
+}
+
+function normalizeUrl(url) {
+  if (!url || typeof url !== 'string') return ''
+  return url.trim().toLowerCase().replace(/\/+$/, '')
+}
+
+function isUrlMatch(urlA, urlB) {
+  const a = normalizeUrl(urlA)
+  const b = normalizeUrl(urlB)
+  if (!a || !b) return false
+  if (a === b) return true
+  if (a.endsWith('/' + b) || b.endsWith('/' + a)) return true
+  return false
+}
+
+const cctvUrlDuplicateWarning = computed(() => {
+  const url = activeCctv.streamUrl
+  if (!url || !url.trim()) return null
+  return cctvStore.cameras.find((c) => {
+    if (modalMode.value === 'edit' && c.id === activeCctv.id) return false
+    return (
+      isUrlMatch(url, c.streamUrl) ||
+      isUrlMatch(url, c.adapterConfig?.streamUrl) ||
+      isUrlMatch(url, c.streamKey) ||
+      isUrlMatch(url, c.host)
+    )
+  }) || null
+})
+
+const audioUrlDuplicateWarning = computed(() => {
+  const url = activeSpeaker.whipUrl
+  if (!url || !url.trim()) return null
+  return audioStore.activeDevices.find((d) => {
+    if (modalMode.value === 'edit' && d.id === activeSpeaker.id) return false
+    return (
+      isUrlMatch(url, d.whipUrl) ||
+      isUrlMatch(url, d.adapterConfig?.whipUrl) ||
+      isUrlMatch(url, d.host)
+    )
+  }) || null
 })
 
 // Average dynamic latencies (similar to AudioPagingView)
@@ -737,6 +929,38 @@ const activeCctv = reactive({
   description: ''
 })
 
+const cctvErrors = reactive({
+  name: '',
+  siteId: '',
+  streamUrl: '',
+  latitude: '',
+  longitude: ''
+})
+
+const speakerErrors = reactive({
+  name: '',
+  siteId: '',
+  whipUrl: '',
+  latitude: '',
+  longitude: ''
+})
+
+function resetCctvErrors() {
+  cctvErrors.name = ''
+  cctvErrors.siteId = ''
+  cctvErrors.streamUrl = ''
+  cctvErrors.latitude = ''
+  cctvErrors.longitude = ''
+}
+
+function resetSpeakerErrors() {
+  speakerErrors.name = ''
+  speakerErrors.siteId = ''
+  speakerErrors.whipUrl = ''
+  speakerErrors.latitude = ''
+  speakerErrors.longitude = ''
+}
+
 const siteOptions = computed(() => {
   return cctvStore.sites.map((s) => ({
     value: s.id,
@@ -745,10 +969,36 @@ const siteOptions = computed(() => {
 })
 
 const zoneOptions = computed(() => {
-  return cctvStore.zones.map((z) => ({
-    value: z.id,
-    label: `${z.id} - ${z.name}`
-  }))
+  return [
+    { value: '', label: '-- Unassigned (Tanpa Zona) --' },
+    ...cctvStore.zones.map((z) => {
+      const site = cctvStore.sites.find((s) => s.id === z.siteId)
+      const siteLabel = site ? site.name : z.siteId
+      return {
+        value: z.id,
+        label: `${z.id} - ${z.name} (${siteLabel})`
+      }
+    })
+  ]
+})
+
+// Sinkronkan siteId secara otomatis saat memilih zona di modal
+watch(() => activeCctv.zoneId, (newZoneId) => {
+  if (newZoneId) {
+    const matched = cctvStore.zones.find((z) => z.id === newZoneId)
+    if (matched && matched.siteId) {
+      activeCctv.siteId = matched.siteId
+    }
+  }
+})
+
+watch(() => activeSpeaker.zoneId, (newZoneId) => {
+  if (newZoneId) {
+    const matched = cctvStore.zones.find((z) => z.id === newZoneId)
+    if (matched && matched.siteId) {
+      activeSpeaker.siteId = matched.siteId
+    }
+  }
 })
 
 const cctvColumns = [
@@ -777,6 +1027,7 @@ const audioColumns = [
 function openCreateModal(type) {
   modalMode.value = 'create'
   if (type === 'AUDIO') {
+    resetSpeakerErrors()
     activeSpeaker.id = ''
     activeSpeaker.name = ''
     activeSpeaker.siteId = cctvStore.sites[0]?.id || ''
@@ -787,6 +1038,7 @@ function openCreateModal(type) {
     activeSpeaker.volume = 80
     speakerModalOpen.value = true
   } else {
+    resetCctvErrors()
     activeCctv.id = ''
     activeCctv.name = ''
     activeCctv.siteId = cctvStore.sites[0]?.id || ''
@@ -801,10 +1053,11 @@ function openCreateModal(type) {
 
 function handleEditCctv(row) {
   modalMode.value = 'edit'
+  resetCctvErrors()
   activeCctv.id = row.id
   activeCctv.name = row.name
   activeCctv.siteId = row.siteId || ''
-  activeCctv.zoneId = row.zoneId || ''
+  activeCctv.zoneId = (row.zoneId && isZoneActive(row.zoneId)) ? row.zoneId : ''
   activeCctv.streamUrl = row.streamUrl || ''
   activeCctv.latitude = row.latitude ? Number(row.latitude) : null
   activeCctv.longitude = row.longitude ? Number(row.longitude) : null
@@ -843,14 +1096,61 @@ async function testModalCctvPing() {
 }
 
 async function saveCctv() {
+  resetCctvErrors()
+  let hasError = false
+
   if (!activeCctv.name.trim()) {
-    toast.error('Form Belum Lengkap', 'Nama kamera wajib diisi.')
+    cctvErrors.name = 'Nama kamera wajib diisi.'
+    hasError = true
+  }
+
+  if (!activeCctv.siteId) {
+    cctvErrors.siteId = 'Lokasi site wajib dipilih.'
+    hasError = true
+  }
+
+  if (!activeCctv.streamUrl?.trim()) {
+    cctvErrors.streamUrl = 'URL stream kamera wajib diisi.'
+    hasError = true
+  } else {
+    const streamLower = activeCctv.streamUrl.trim().toLowerCase()
+    const validCctvProtocols = ['http://', 'https://', 'rtsp://', 'rtsps://', 'ws://', 'wss://']
+    const hasValidProtocol = validCctvProtocols.some(proto => streamLower.startsWith(proto))
+    if (!hasValidProtocol) {
+      cctvErrors.streamUrl = 'Protokol URL tidak valid. Gunakan http://, https://, rtsp://, rtsps://, atau ws(s)://'
+      hasError = true
+    } else if (cctvUrlDuplicateWarning.value) {
+      cctvErrors.streamUrl = `URL stream ini sudah terdaftar pada kamera ${cctvUrlDuplicateWarning.value.id} (${cctvUrlDuplicateWarning.value.name}).`
+      hasError = true
+    }
+  }
+
+  if (activeCctv.latitude !== null && activeCctv.latitude !== '') {
+    const lat = Number(activeCctv.latitude)
+    if (isNaN(lat) || lat < -90 || lat > 90) {
+      cctvErrors.latitude = 'Latitude harus berupa angka antara -90 dan 90.'
+      hasError = true
+    }
+  }
+
+  if (activeCctv.longitude !== null && activeCctv.longitude !== '') {
+    const lng = Number(activeCctv.longitude)
+    if (isNaN(lng) || lng < -180 || lng > 180) {
+      cctvErrors.longitude = 'Longitude harus berupa angka antara -180 dan 180.'
+      hasError = true
+    }
+  }
+
+  if (hasError) {
     return
   }
 
+  const matchedZone = cctvStore.zones.find((z) => z.id === activeCctv.zoneId)
+  const siteId = matchedZone ? matchedZone.siteId : activeCctv.siteId
+
   const payload = {
     name: activeCctv.name.trim(),
-    siteId: activeCctv.siteId,
+    siteId: siteId,
     zoneId: activeCctv.zoneId || null,
     streamUrl: activeCctv.streamUrl?.trim() || null,
     latitude: activeCctv.latitude !== null && activeCctv.latitude !== '' ? Number(activeCctv.latitude) : null,
@@ -861,24 +1161,34 @@ async function saveCctv() {
   try {
     if (modalMode.value === 'create') {
       const created = await cctvStore.createCamera(payload)
+      cctvModalOpen.value = false
       toast.success('Kamera Didaftarkan', `ID otomatis ${created.id} berhasil dibuat dan disimpan!`)
     } else {
       await cctvStore.updateCamera(activeCctv.id, payload)
-      toast.success('Kamera Diperbarui', `Data kamera ${activeCctv.id} berhasil diperbarui. ID tetap terkunci.`)
+      cctvModalOpen.value = false
+      toast.success('Kamera Diperbarui', `Data kamera ${activeCctv.id} berhasil diperbarui.`)
     }
-    cctvModalOpen.value = false
+    await cctvStore.fetchSitesAndZones()
   } catch (err) {
-    toast.error('Gagal Menyimpan', err.message || 'Terjadi kesalahan')
+    const errMsg = err.message || 'Terjadi kesalahan'
+    if (errMsg.toLowerCase().includes('name') || errMsg.toLowerCase().includes('nama')) {
+      cctvErrors.name = errMsg
+    } else if (errMsg.toLowerCase().includes('stream') || errMsg.toLowerCase().includes('url')) {
+      cctvErrors.streamUrl = errMsg
+    } else {
+      toast.error('Gagal Menyimpan Kamera', errMsg)
+    }
   }
 }
 
 function handleEditSpeaker(row) {
   modalMode.value = 'edit'
+  resetSpeakerErrors()
   activeSpeaker.id = row.id
   activeSpeaker.name = row.name
-  activeSpeaker.siteId = row.siteId
-  activeSpeaker.zoneId = row.zoneId
-  activeSpeaker.whipUrl = row.whipUrl
+  activeSpeaker.siteId = row.siteId || ''
+  activeSpeaker.zoneId = (row.zoneId && isZoneActive(row.zoneId)) ? row.zoneId : ''
+  activeSpeaker.whipUrl = row.whipUrl || ''
   activeSpeaker.latitude = row.latitude ? Number(row.latitude) : null
   activeSpeaker.longitude = row.longitude ? Number(row.longitude) : null
   activeSpeaker.volume = row.volume || 80
@@ -922,45 +1232,98 @@ async function testModalPing() {
   }
 }
 
-function saveSpeaker() {
+async function saveSpeaker() {
+  resetSpeakerErrors()
+  let hasError = false
+
   if (!activeSpeaker.name.trim()) {
-    toast.error('Form Belum Lengkap', 'Nama speaker wajib diisi.')
-    return
-  }
-  if (!activeSpeaker.whipUrl.trim()) {
-    toast.error('Form Belum Lengkap', 'URL WHIP wajib diisi.')
-    return
+    speakerErrors.name = 'Nama speaker wajib diisi.'
+    hasError = true
   }
 
-  speakerModalOpen.value = false
+  if (!activeSpeaker.siteId) {
+    speakerErrors.siteId = 'Lokasi site wajib dipilih.'
+    hasError = true
+  }
+
+  if (!activeSpeaker.whipUrl?.trim()) {
+    speakerErrors.whipUrl = 'URL WHIP wajib diisi.'
+    hasError = true
+  } else {
+    const whipLower = activeSpeaker.whipUrl.trim().toLowerCase()
+    const validAudioProtocols = ['https://', 'http://', 'wss://', 'ws://']
+    const hasValidProtocol = validAudioProtocols.some(proto => whipLower.startsWith(proto))
+    if (!hasValidProtocol) {
+      speakerErrors.whipUrl = 'Protokol URL tidak valid. Gunakan https:// atau http:// (endpoint WHIP).'
+      hasError = true
+    } else if (audioUrlDuplicateWarning.value) {
+      speakerErrors.whipUrl = `URL stream audio WHIP sudah terdaftar pada speaker ${audioUrlDuplicateWarning.value.id} (${audioUrlDuplicateWarning.value.name}).`
+      hasError = true
+    }
+  }
+
+  if (activeSpeaker.latitude !== null && activeSpeaker.latitude !== '') {
+    const lat = Number(activeSpeaker.latitude)
+    if (isNaN(lat) || lat < -90 || lat > 90) {
+      speakerErrors.latitude = 'Latitude harus berupa angka antara -90 dan 90.'
+      hasError = true
+    }
+  }
+
+  if (activeSpeaker.longitude !== null && activeSpeaker.longitude !== '') {
+    const lng = Number(activeSpeaker.longitude)
+    if (isNaN(lng) || lng < -180 || lng > 180) {
+      speakerErrors.longitude = 'Longitude harus berupa angka antara -180 dan 180.'
+      hasError = true
+    }
+  }
+
+  if (hasError) {
+    return
+  }
 
   const matchedZone = cctvStore.zones.find(z => z.id === activeSpeaker.zoneId)
+  const siteId = matchedZone ? matchedZone.siteId : activeSpeaker.siteId
   const zoneName = matchedZone?.name || '-'
 
-  if (modalMode.value === 'create') {
-    const created = audioStore.createDevice({
-      name: activeSpeaker.name,
-      siteId: activeSpeaker.siteId,
-      zoneId: activeSpeaker.zoneId,
-      zoneName: zoneName,
-      whipUrl: activeSpeaker.whipUrl,
-      latitude: activeSpeaker.latitude !== null && activeSpeaker.latitude !== '' ? Number(activeSpeaker.latitude) : null,
-      longitude: activeSpeaker.longitude !== null && activeSpeaker.longitude !== '' ? Number(activeSpeaker.longitude) : null,
-      volume: activeSpeaker.volume
-    })
-    toast.success('Speaker Didaftarkan', `ID otomatis ${created.id} (16kHz Mono) berhasil dibuat!`)
-  } else {
-    audioStore.updateDevice(activeSpeaker.id, {
-      name: activeSpeaker.name,
-      siteId: activeSpeaker.siteId,
-      zoneId: activeSpeaker.zoneId,
-      zoneName: zoneName,
-      whipUrl: activeSpeaker.whipUrl,
-      latitude: activeSpeaker.latitude !== null && activeSpeaker.latitude !== '' ? Number(activeSpeaker.latitude) : null,
-      longitude: activeSpeaker.longitude !== null && activeSpeaker.longitude !== '' ? Number(activeSpeaker.longitude) : null,
-      volume: activeSpeaker.volume
-    })
-    toast.success('Speaker Diperbarui', `Data ${activeSpeaker.id} berhasil diperbarui. ID tetap terkunci.`)
+  try {
+    if (modalMode.value === 'create') {
+      const created = await audioStore.createDevice({
+        name: activeSpeaker.name.trim(),
+        siteId: siteId,
+        zoneId: activeSpeaker.zoneId || null,
+        zoneName: zoneName,
+        whipUrl: activeSpeaker.whipUrl.trim(),
+        latitude: activeSpeaker.latitude !== null && activeSpeaker.latitude !== '' ? Number(activeSpeaker.latitude) : null,
+        longitude: activeSpeaker.longitude !== null && activeSpeaker.longitude !== '' ? Number(activeSpeaker.longitude) : null,
+        volume: activeSpeaker.volume
+      })
+      speakerModalOpen.value = false
+      toast.success('Speaker Didaftarkan', `ID otomatis ${created.id} (16kHz Mono) berhasil dibuat!`)
+    } else {
+      await audioStore.updateDevice(activeSpeaker.id, {
+        name: activeSpeaker.name.trim(),
+        siteId: siteId,
+        zoneId: activeSpeaker.zoneId || null,
+        zoneName: zoneName,
+        whipUrl: activeSpeaker.whipUrl.trim(),
+        latitude: activeSpeaker.latitude !== null && activeSpeaker.latitude !== '' ? Number(activeSpeaker.latitude) : null,
+        longitude: activeSpeaker.longitude !== null && activeSpeaker.longitude !== '' ? Number(activeSpeaker.longitude) : null,
+        volume: activeSpeaker.volume
+      })
+      speakerModalOpen.value = false
+      toast.success('Speaker Diperbarui', `Data ${activeSpeaker.id} berhasil diperbarui.`)
+    }
+    await cctvStore.fetchSitesAndZones()
+  } catch (err) {
+    const errMsg = err.message || 'Terjadi kesalahan'
+    if (errMsg.toLowerCase().includes('name') || errMsg.toLowerCase().includes('nama')) {
+      speakerErrors.name = errMsg
+    } else if (errMsg.toLowerCase().includes('whip') || errMsg.toLowerCase().includes('url')) {
+      speakerErrors.whipUrl = errMsg
+    } else {
+      toast.error('Gagal Menyimpan Speaker', errMsg)
+    }
   }
 }
 
@@ -970,7 +1333,7 @@ async function confirmDelete() {
 
   try {
     if (deleteType.value === 'AUDIO') {
-      audioStore.deleteDevice(toDeleteDevice.value.id)
+      await audioStore.deleteDevice(toDeleteDevice.value.id)
       if (speakerPage.value > speakerTotalPages.value) {
         speakerPage.value = Math.max(1, speakerTotalPages.value)
       }
@@ -990,6 +1353,7 @@ async function confirmDelete() {
 onMounted(async () => {
   await Promise.all([
     cctvStore.fetchCameras(),
+    audioStore.fetchAudioDevices(),
     cctvStore.fetchSitesAndZones()
   ])
   // Polling status kamera 1 detik via MediaMTX API

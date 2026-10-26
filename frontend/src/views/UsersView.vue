@@ -132,17 +132,22 @@
         </div>
       </template>
 
-      <!-- Pagination Footer -->
+      <!-- Table Pagination Footer (Identik dengan Device Management) -->
       <template #footer>
         <div class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-400">
-          <div>
-            <span>Menampilkan </span>
-            <strong class="text-slate-200">
-              {{ filteredUsers.length === 0 ? 0 : (currentPage - 1) * pageSize + 1 }} - {{ Math.min(currentPage * pageSize, filteredUsers.length) }}
-            </strong>
-            <span> dari </span>
-            <strong class="text-slate-200">{{ filteredUsers.length }}</strong>
-            <span> pengguna terdaftar</span>
+          <div class="flex items-center gap-2">
+            <span>Baris per halaman:</span>
+            <select
+              v-model="pageSize"
+              class="bg-[#151f33] border border-[#283548] text-slate-200 rounded px-2 py-0.5 cursor-pointer focus:outline-none"
+              @change="currentPage = 1"
+            >
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
           </div>
 
           <div class="flex items-center gap-1.5">
@@ -201,9 +206,16 @@
               type="text"
               :disabled="userModalMode === 'edit'"
               placeholder="contoh: operator_1"
-              class="w-full bg-[#111827] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+              :class="[
+                'w-full bg-[#111827] border rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed',
+                formErrors.username ? 'border-rose-500 focus:border-rose-500' : 'border-[#283548] focus:border-blue-500'
+              ]"
+              @input="formErrors.username = ''"
             />
-            <span v-if="userModalMode === 'edit'" class="text-[10px] text-slate-500 font-mono mt-0.5 block">
+            <span v-if="formErrors.username" class="text-[10px] text-rose-400 font-mono mt-1 block">
+              ⚠ {{ formErrors.username }}
+            </span>
+            <span v-else-if="userModalMode === 'edit'" class="text-[10px] text-slate-500 font-mono mt-0.5 block">
               Username tidak dapat diubah setelah dibuat.
             </span>
           </div>
@@ -223,21 +235,27 @@
           </div>
         </div>
 
-        <!-- Nama Lengkap -->
-        <div>
-          <label class="text-xs font-medium text-slate-300 block mb-1">
-            Nama Lengkap <span class="text-rose-400">*</span>
-          </label>
-          <input
-            v-model="activeUser.fullName"
-            type="text"
-            placeholder="contoh: Budi Santoso"
-            class="w-full bg-[#111827] border border-[#283548] rounded px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <!-- Email & Password -->
+        <!-- Nama Lengkap & Email -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-medium text-slate-300 block mb-1">
+              Nama Lengkap <span class="text-rose-400">*</span>
+            </label>
+            <input
+              v-model="activeUser.fullName"
+              type="text"
+              placeholder="contoh: Budi Santoso"
+              :class="[
+                'w-full bg-[#111827] border rounded px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none transition-colors',
+                formErrors.fullName ? 'border-rose-500 focus:border-rose-500' : 'border-[#283548] focus:border-blue-500'
+              ]"
+              @input="formErrors.fullName = ''"
+            />
+            <span v-if="formErrors.fullName" class="text-[10px] text-rose-400 font-mono mt-1 block">
+              ⚠ {{ formErrors.fullName }}
+            </span>
+          </div>
+
           <div>
             <label class="text-xs font-medium text-slate-300 block mb-1">
               Email (Opsional)
@@ -246,21 +264,37 @@
               v-model="activeUser.email"
               type="email"
               placeholder="budi@instansi.go.id"
-              class="w-full bg-[#111827] border border-[#283548] rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              :class="[
+                'w-full bg-[#111827] border rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none transition-colors',
+                formErrors.email ? 'border-rose-500 focus:border-rose-500' : 'border-[#283548] focus:border-blue-500'
+              ]"
+              @input="formErrors.email = ''"
             />
+            <span v-if="formErrors.email" class="text-[10px] text-rose-400 font-mono mt-1 block">
+              ⚠ {{ formErrors.email }}
+            </span>
           </div>
+        </div>
 
+        <!-- 2 Verifikasi Password (Minimal 8 Karakter) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-[#1e2a3b]">
+          <!-- Input Password -->
           <div>
             <label class="text-xs font-medium text-slate-300 block mb-1">
-              Password <span v-if="userModalMode === 'create'" class="text-rose-400">*</span>
+              {{ userModalMode === 'create' ? 'Password' : 'Password Baru' }}
+              <span v-if="userModalMode === 'create'" class="text-rose-400">*</span>
             </label>
             <div class="relative">
               <input
                 v-model="activeUser.password"
                 :type="showPassword ? 'text' : 'password'"
                 autocomplete="new-password"
-                :placeholder="userModalMode === 'create' ? 'Minimal 6 karakter' : 'Kosongkan jika tidak diubah'"
-                class="w-full bg-[#111827] border border-[#283548] rounded px-3 py-1.5 pr-9 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                :placeholder="userModalMode === 'create' ? 'Minimal 8 karakter' : 'Kosongkan jika tidak diubah'"
+                :class="[
+                  'w-full bg-[#111827] border rounded px-3 py-1.5 pr-9 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none transition-colors',
+                  formErrors.password ? 'border-rose-500 focus:border-rose-500' : 'border-[#283548] focus:border-blue-500'
+                ]"
+                @input="formErrors.password = ''"
               />
               <button
                 type="button"
@@ -273,6 +307,56 @@
                 <Eye v-else class="w-4 h-4" />
               </button>
             </div>
+            <span v-if="formErrors.password" class="text-[10px] text-rose-400 font-mono mt-1 block">
+              ⚠ {{ formErrors.password }}
+            </span>
+            <span v-else-if="activeUser.password && activeUser.password.length < 8" class="text-[10px] text-amber-400 font-mono mt-1 block">
+              Kurang {{ 8 - activeUser.password.length }} karakter lagi (min. 8)
+            </span>
+            <span v-else-if="userModalMode === 'edit' && !activeUser.password" class="text-[10px] text-slate-500 font-mono mt-1 block">
+              Kosongkan jika tidak ingin mengubah password.
+            </span>
+          </div>
+
+          <!-- Konfirmasi Password (Verifikasi Ke-2) -->
+          <div>
+            <label class="text-xs font-medium text-slate-300 block mb-1">
+              {{ userModalMode === 'create' ? 'Konfirmasi Password' : 'Konfirmasi Password Baru' }}
+              <span v-if="userModalMode === 'create' || activeUser.password" class="text-rose-400">*</span>
+            </label>
+            <div class="relative">
+              <input
+                v-model="confirmPassword"
+                :type="showConfirmPassword ? 'text' : 'password'"
+                autocomplete="new-password"
+                :placeholder="userModalMode === 'create' ? 'Ulangi password (min. 8)' : 'Ulangi password baru'"
+                :disabled="userModalMode === 'edit' && !activeUser.password"
+                :class="[
+                  'w-full bg-[#111827] border rounded px-3 py-1.5 pr-9 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed transition-colors',
+                  formErrors.confirmPassword ? 'border-rose-500 focus:border-rose-500' : 'border-[#283548] focus:border-blue-500'
+                ]"
+                @input="formErrors.confirmPassword = ''"
+              />
+              <button
+                type="button"
+                class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-200 focus:outline-none cursor-pointer"
+                tabindex="-1"
+                :title="showConfirmPassword ? 'Sembunyikan konfirmasi' : 'Lihat konfirmasi'"
+                @click="showConfirmPassword = !showConfirmPassword"
+              >
+                <EyeOff v-if="showConfirmPassword" class="w-4 h-4" />
+                <Eye v-else class="w-4 h-4" />
+              </button>
+            </div>
+            <span v-if="formErrors.confirmPassword" class="text-[10px] text-rose-400 font-mono mt-1 block">
+              ⚠ {{ formErrors.confirmPassword }}
+            </span>
+            <span v-else-if="confirmPassword && activeUser.password !== confirmPassword" class="text-[10px] text-rose-400 font-mono mt-1 block">
+              Konfirmasi password tidak cocok
+            </span>
+            <span v-else-if="confirmPassword && activeUser.password === confirmPassword && activeUser.password.length >= 8" class="text-[10px] text-emerald-400 font-mono mt-1 block">
+              ✓ Konfirmasi password cocok
+            </span>
           </div>
         </div>
       </div>
@@ -297,7 +381,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { Table, Button, Modal, ConfirmationDialog } from '../components/ui/index.js'
 import { useUsersStore } from '../stores/users.js'
 import { useAuthStore } from '../stores/auth.js'
@@ -309,11 +393,11 @@ const usersStore = useUsersStore()
 const authStore = useAuthStore()
 
 // -----------------------------------------------------------------------------
-// FILTER & PAGINATION STATE
+// FILTER & PAGINATION STATE (Identik dengan Device Management)
 // -----------------------------------------------------------------------------
 const selectedRoleFilter = ref('ALL')
 const searchQuery = ref('')
-const pageSize = 5
+const pageSize = ref(5)
 const currentPage = ref(1)
 
 const columns = [
@@ -347,18 +431,30 @@ const filteredUsers = computed(() => {
   })
 })
 
-const totalPages = computed(() => Math.ceil(filteredUsers.value.length / pageSize) || 1)
+const totalPages = computed(() => Math.ceil(filteredUsers.value.length / pageSize.value) || 1)
 const paginatedUsers = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  return filteredUsers.value.slice(start, start + pageSize)
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredUsers.value.slice(start, start + pageSize.value)
+})
+
+watch(totalPages, (newTotal) => {
+  if (currentPage.value > newTotal) {
+    currentPage.value = Math.max(1, newTotal)
+  }
+})
+
+watch([selectedRoleFilter, searchQuery], () => {
+  currentPage.value = 1
 })
 
 // -----------------------------------------------------------------------------
-// MODAL STATE & ACTIVE USER
+// MODAL STATE & ACTIVE USER (2 Verifikasi Password & Minimal 8 Karakter)
 // -----------------------------------------------------------------------------
 const userModalOpen = ref(false)
 const userModalMode = ref('create')
 const showPassword = ref(false)
+const showConfirmPassword = ref(false)
+const confirmPassword = ref('')
 
 const deleteConfirmOpen = ref(false)
 const toDeleteTarget = ref(null)
@@ -373,9 +469,28 @@ const activeUser = reactive({
   isActive: true
 })
 
+const formErrors = reactive({
+  username: '',
+  fullName: '',
+  email: '',
+  password: '',
+  confirmPassword: ''
+})
+
+function resetFormErrors() {
+  formErrors.username = ''
+  formErrors.fullName = ''
+  formErrors.email = ''
+  formErrors.password = ''
+  formErrors.confirmPassword = ''
+}
+
 function openCreateUserModal() {
   userModalMode.value = 'create'
   showPassword.value = false
+  showConfirmPassword.value = false
+  confirmPassword.value = ''
+  resetFormErrors()
   activeUser.id = ''
   activeUser.username = ''
   activeUser.fullName = ''
@@ -389,6 +504,9 @@ function openCreateUserModal() {
 function handleEditUser(row) {
   userModalMode.value = 'edit'
   showPassword.value = false
+  showConfirmPassword.value = false
+  confirmPassword.value = ''
+  resetFormErrors()
   activeUser.id = row.id
   activeUser.username = row.username
   activeUser.fullName = row.fullName
@@ -405,19 +523,70 @@ function handleDeleteUser(row) {
 }
 
 async function saveUser() {
+  resetFormErrors()
+  let hasError = false
+
+  // Validasi Username
   if (userModalMode.value === 'create') {
     if (!activeUser.username.trim()) {
-      toast.error('Form Belum Lengkap', 'Username wajib diisi.')
-      return
+      formErrors.username = 'Username wajib diisi.'
+      hasError = true
+    } else if (activeUser.username.trim().length < 3) {
+      formErrors.username = 'Username minimal 3 karakter.'
+      hasError = true
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(activeUser.username.trim())) {
+      formErrors.username = 'Username hanya boleh huruf, angka, _, dan -.'
+      hasError = true
     }
-    if (!activeUser.password || activeUser.password.length < 6) {
-      toast.error('Password Tidak Valid', 'Password minimal 6 karakter.')
-      return
+
+    // Validasi Password Baru
+    if (!activeUser.password) {
+      formErrors.password = 'Password wajib diisi.'
+      hasError = true
+    } else if (activeUser.password.length < 8) {
+      formErrors.password = 'Password minimal 8 karakter.'
+      hasError = true
+    }
+
+    // Validasi Konfirmasi Password
+    if (!confirmPassword.value) {
+      formErrors.confirmPassword = 'Konfirmasi password wajib diisi.'
+      hasError = true
+    } else if (activeUser.password !== confirmPassword.value) {
+      formErrors.confirmPassword = 'Konfirmasi password tidak cocok.'
+      hasError = true
+    }
+  } else {
+    // Mode edit: hanya divalidasi jika user mengisi password baru
+    if (activeUser.password || confirmPassword.value) {
+      if (activeUser.password.length < 8) {
+        formErrors.password = 'Password baru minimal 8 karakter.'
+        hasError = true
+      }
+      if (activeUser.password !== confirmPassword.value) {
+        formErrors.confirmPassword = 'Konfirmasi password baru tidak cocok.'
+        hasError = true
+      }
     }
   }
 
+  // Validasi Nama Lengkap
   if (!activeUser.fullName.trim()) {
-    toast.error('Form Belum Lengkap', 'Nama lengkap wajib diisi.')
+    formErrors.fullName = 'Nama lengkap wajib diisi.'
+    hasError = true
+  }
+
+  // Validasi Email (jika diisi)
+  if (activeUser.email && activeUser.email.trim()) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(activeUser.email.trim())) {
+      formErrors.email = 'Format email tidak valid.'
+      hasError = true
+    }
+  }
+
+  // Jika ada kesalahan input form, batalkan submit (error sudah tampil di bawah input field)
+  if (hasError) {
     return
   }
 
@@ -429,7 +598,7 @@ async function saveUser() {
     zoneIds: []
   }
 
-  if (activeUser.password && activeUser.password.trim().length >= 6) {
+  if (activeUser.password && activeUser.password.trim().length >= 8) {
     payload.password = activeUser.password.trim()
   }
 
@@ -437,14 +606,22 @@ async function saveUser() {
     if (userModalMode.value === 'create') {
       payload.username = activeUser.username.trim().toLowerCase()
       const created = await usersStore.createUser(payload)
+      userModalOpen.value = false
       toast.success('Pengguna Dibuat', `Pengguna ${created.id} (@${created.username}) berhasil didaftarkan!`)
     } else {
       await usersStore.updateUser(activeUser.id, payload)
+      userModalOpen.value = false
       toast.success('Pengguna Diperbarui', `Data pengguna ${activeUser.id} berhasil diperbarui.`)
     }
-    userModalOpen.value = false
   } catch (err) {
-    toast.error('Gagal Menyimpan Pengguna', err.message || 'Terjadi kesalahan sistem')
+    const errMsg = err.message || 'Terjadi kesalahan sistem'
+    if (errMsg.toLowerCase().includes('username')) {
+      formErrors.username = errMsg
+    } else if (errMsg.toLowerCase().includes('email')) {
+      formErrors.email = errMsg
+    } else {
+      toast.error('Gagal Menyimpan Pengguna', errMsg)
+    }
   }
 }
 

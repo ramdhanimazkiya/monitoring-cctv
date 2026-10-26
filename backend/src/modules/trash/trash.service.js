@@ -63,7 +63,7 @@ export async function listDeletedDevices() {
   const normalizedAudio = audioDevices.map((a) => ({
     ...a,
     deviceType: "AUDIO",
-    whipUrl: a.adapterConfig?.whipUrl || null,
+    whipUrl: a.adapterConfig?.whipUrl || (a.host && a.host.startsWith("http") ? a.host : null),
   }));
 
   return {

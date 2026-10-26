@@ -2,32 +2,14 @@
   <div class="min-h-screen bg-[#070b12] flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 relative overflow-hidden select-none">
     <!-- Sophisticated background grid & radial ambiance -->
     <div class="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:28px_28px] opacity-35"></div>
-    <div
-      :class="[
-        'absolute -top-44 -right-44 w-[450px] h-[450px] rounded-full blur-[120px] pointer-events-none transition-all duration-700',
-        selectedPortal === 'ADMIN' ? 'bg-amber-500/10' : 'bg-blue-600/10'
-      ]"
-    ></div>
-    <div
-      :class="[
-        'absolute -bottom-44 -left-44 w-[450px] h-[450px] rounded-full blur-[120px] pointer-events-none transition-all duration-700',
-        selectedPortal === 'ADMIN' ? 'bg-amber-600/5' : 'bg-cyan-600/5'
-      ]"
-    ></div>
+    <div class="absolute -top-44 -right-44 w-[480px] h-[480px] rounded-full blur-[130px] pointer-events-none bg-blue-600/15"></div>
+    <div class="absolute -bottom-44 -left-44 w-[480px] h-[480px] rounded-full blur-[130px] pointer-events-none bg-cyan-600/10"></div>
 
     <div class="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
       <!-- Enterprise Brand Header -->
       <div class="text-center mb-6">
-        <div
-          :class="[
-            'inline-flex items-center justify-center w-14 h-14 rounded-2xl border transition-all duration-500 mb-3 shadow-lg',
-            selectedPortal === 'ADMIN'
-              ? 'bg-amber-950/40 border-amber-500/60 text-amber-400 shadow-amber-500/10'
-              : 'bg-blue-950/40 border-blue-500/60 text-blue-400 shadow-blue-500/10'
-          ]"
-        >
-          <ShieldAlert v-if="selectedPortal === 'ADMIN'" class="w-7 h-7" />
-          <Radio v-else class="w-7 h-7 animate-pulse" />
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl border border-blue-500/50 bg-blue-950/40 text-blue-400 shadow-lg shadow-blue-500/20 mb-3 transition-transform hover:scale-105 duration-300">
+          <ShieldCheck class="w-7 h-7" />
         </div>
 
         <h1 class="text-xl font-bold tracking-wider text-slate-100 font-mono uppercase">
@@ -38,70 +20,22 @@
         </p>
       </div>
 
-      <!-- Portal Tabs (Option A: Explicit Separation) -->
-      <div class="grid grid-cols-2 p-1 bg-[#0b101b] border border-[#1e2a3b] rounded-xl text-xs font-mono mb-3 shadow-inner">
-        <button
-          type="button"
-          :class="[
-            'flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer',
-            selectedPortal === 'OPERATOR'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-[#121929]'
-          ]"
-          @click="selectPortal('OPERATOR')"
-        >
-          <Radio class="w-3.5 h-3.5" />
-          <span>PORTAL OPERATOR</span>
-        </button>
-
-        <button
-          type="button"
-          :class="[
-            'flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer',
-            selectedPortal === 'ADMIN'
-              ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-[#121929]'
-          ]"
-          @click="selectPortal('ADMIN')"
-        >
-          <ShieldAlert class="w-3.5 h-3.5" />
-          <span>PORTAL ADMIN</span>
-        </button>
-      </div>
-
-      <!-- Main Login Card -->
-      <div
-        :class="[
-          'bg-[#0f1624] border py-6 px-6 sm:px-8 shadow-2xl rounded-2xl transition-all duration-500 backdrop-blur-sm',
-          selectedPortal === 'ADMIN' ? 'border-amber-500/40' : 'border-blue-500/40'
-        ]"
-      >
-        <!-- Portal Subheader / Scope -->
-        <div class="mb-5 pb-3 border-b border-[#1e2a3b]">
+      <!-- Main Login Card (Single Unified Form) -->
+      <div class="bg-[#0f1624]/95 border border-slate-800/80 shadow-2xl rounded-2xl py-6 px-6 sm:px-8 backdrop-blur-md transition-all duration-300 hover:border-slate-700">
+        <!-- Subheader / Scope -->
+        <div class="mb-5 pb-3.5 border-b border-[#1e2a3b]">
           <div class="flex items-center justify-between">
-            <span
-              :class="[
-                'text-[10px] font-mono font-bold px-2 py-0.5 rounded border uppercase tracking-wider',
-                selectedPortal === 'ADMIN'
-                  ? 'bg-amber-950/70 text-amber-300 border-amber-600/50'
-                  : 'bg-blue-950/70 text-blue-300 border-blue-600/50'
-              ]"
-            >
-              {{ selectedPortal === 'ADMIN' ? 'Otoritas: Administrator Sistem' : 'Otoritas: Operator Monitoring' }}
-            </span>
-            <span class="text-[10px] font-mono text-slate-400 flex items-center gap-1">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <!-- <span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded border uppercase tracking-wider bg-blue-950/70 text-blue-300 border-blue-600/50">
+              Autentikasi Terpadu
+            </span> -->
+            <!-- <span class="text-[10px] font-mono text-slate-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               Sesi Terenkripsi
-            </span>
+            </span> -->
           </div>
 
-          <p class="text-xs text-slate-400 mt-2 leading-relaxed">
-            <template v-if="selectedPortal === 'OPERATOR'">
-              Akses operasional khusus: pemantauan CCTV multi-kamera, kontrol audio paging PTT/TTS, dan pelaporan insiden lapangan.
-            </template>
-            <template v-else>
-              Akses administratif khusus: manajemen perangkat, integrasi site & zona, pengelolaan hak akses akun, dan audit trail sistem.
-            </template>
+          <p class="text-xs text-slate-400 mt-2.5 leading-relaxed">
+            Masukkan kredensial akun terdaftar Anda untuk mengakses pemantauan CCTV, kontrol audio paging, dan administrasi sistem.
           </p>
         </div>
 
@@ -124,7 +58,7 @@
           </button>
         </div>
 
-        <!-- Professional Form (Tanpa Placeholder, Input Manual Kredensial Asli) -->
+        <!-- Unified Single Form -->
         <form class="space-y-4" @submit.prevent="handleSubmit">
           <Input
             v-model="form.username"
@@ -152,30 +86,30 @@
           </Input>
 
           <div class="flex items-center justify-between text-xs pt-1">
-            <span class="text-slate-400 text-[11px] font-mono flex items-center gap-1.5">
+            <!-- <span class="text-slate-400 text-[11px] font-mono flex items-center gap-1.5">
               <Lock class="w-3 h-3 text-slate-500" />
               HttpOnly Secure Cookie
-            </span>
-            <span class="text-slate-500 text-[11px] font-mono">
-              Argon2id / SHA-256
-            </span>
+            </span> -->
+            <!-- <span class="text-slate-500 text-[11px] font-mono">
+              Argon2id & Stream JWT
+            </span> -->
           </div>
 
           <Button
             type="submit"
-            :variant="selectedPortal === 'ADMIN' ? 'warning' : 'primary'"
+            variant="primary"
             size="md"
             block
             :loading="loading"
-            class="mt-3 font-semibold"
+            class="mt-3 font-semibold shadow-lg shadow-blue-600/25 hover:shadow-blue-600/40 transition-shadow"
           >
-            {{ selectedPortal === 'ADMIN' ? 'Masuk ke Portal Administrator' : 'Masuk ke Portal Operator' }}
+            Login
           </Button>
         </form>
 
         <!-- Compliance & Security Assurance Badge -->
         <div class="mt-5 pt-3.5 border-t border-[#1e2a3b] flex items-center justify-between text-[10px] font-mono text-slate-500">
-          <span>Keamanan Sesi: TLS 1.3</span>
+          <!-- <span>Keamanan Sesi: TLS 1.3</span> -->
           <span class="text-slate-400">Audit Logging Terpasang</span>
         </div>
       </div>
@@ -201,17 +135,15 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { useToast } from '../composables/useToast.js'
 import { Input, Button, ToastContainer } from '../components/ui/index.js'
-import { ShieldAlert, Radio, User, Lock, AlertCircle } from '@lucide/vue'
+import { ShieldCheck, User, Lock, AlertCircle } from '@lucide/vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const toast = useToast()
 
-const selectedPortal = ref('OPERATOR') // 'OPERATOR' | 'ADMIN'
 const loading = ref(false)
 const errorMessage = ref('')
 
-// Form murni kosong untuk pengisian kredensial asli oleh pengguna (Non-Demo)
 const form = reactive({
   username: '',
   password: ''
@@ -221,17 +153,6 @@ const errors = reactive({
   username: '',
   password: ''
 })
-
-function selectPortal(portal) {
-  if (selectedPortal.value === portal) return
-  selectedPortal.value = portal
-  errorMessage.value = ''
-  errors.username = ''
-  errors.password = ''
-  // Reset input saat berpindah portal untuk memastikan keamanan kredensial
-  form.username = ''
-  form.password = ''
-}
 
 async function handleSubmit() {
   errorMessage.value = ''
@@ -253,7 +174,6 @@ async function handleSubmit() {
     const user = await authStore.login({
       username: form.username.trim(),
       password: form.password,
-      targetPortal: selectedPortal.value,
     })
 
     toast.success('Otentikasi Berhasil', `Selamat datang, ${user.fullName} (${user.role})`)

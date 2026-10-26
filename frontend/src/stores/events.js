@@ -25,10 +25,12 @@ export const useEventsStore = defineStore('events', () => {
     audioOfflineCount: 0,
     recap: {
       cctv: {
-        onlinePercent: 100,
+        onlinePercent: 0,
         offlinePercent: 0
       },
       audio: {
+        onlinePercent: 0,
+        offlinePercent: 0,
         totalPtt: 0,
         totalSessions: 0
       }

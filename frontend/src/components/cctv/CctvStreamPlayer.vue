@@ -178,6 +178,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Hls from 'hls.js'
 import { Video, RotateCw, Volume2, VolumeX, Maximize } from '@lucide/vue'
 import { useAuthStore } from '../../stores/auth.js'
+import { STREAM_GATEWAY_URL } from '../../config/stream.js'
 
 const authStore = useAuthStore()
 
@@ -270,10 +271,15 @@ const isWebPlayerStream = computed(() => {
   return !isHlsStream.value && !isDirectVideo.value && props.streamUrl.startsWith('http')
 })
 
+const isProtectedStream = computed(() => {
+  if (!props.streamUrl) return false
+  return props.streamUrl.includes(STREAM_GATEWAY_URL) || props.streamUrl.includes('zakuyu.fun')
+})
+
 const iframeUrl = computed(() => {
   if (!props.streamUrl) return ''
   // Jangan muat iframe tanpa token jika stream mengarah ke server MediaMTX terproteksi
-  if (props.streamUrl.includes('zakuyu.fun') && !authStore.cctvToken) {
+  if (isProtectedStream.value && !authStore.cctvToken) {
     return ''
   }
   const clean = props.streamUrl.replace(/\/whep$/, '').replace(/\/index\.m3u8$/, '')
@@ -336,7 +342,7 @@ function initPlayer() {
   }
 
   // Jika stream memerlukan token MediaMTX tapi belum ada di state, ambil token dulu
-  if (isWebPlayerStream.value && props.streamUrl.includes('zakuyu.fun') && !authStore.cctvToken) {
+  if (isWebPlayerStream.value && isProtectedStream.value && !authStore.cctvToken) {
     authStore.fetchCctvToken().then((token) => {
       if (token) initPlayer()
     })

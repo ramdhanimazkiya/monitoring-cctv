@@ -37,7 +37,7 @@ export function globalErrorHandler(err, req, res, next) {
     errorCode = "INVALID_JSON_BODY";
     message = "Format JSON di body permintaan tidak valid";
   }
-  // 3. Error Prisma Client
+  // 3. Error Prisma Client & Driver Adapter (PostgreSQL SQLSTATE)
   else if (err.code && typeof err.code === "string" && err.code.startsWith("P")) {
     statusCode = 400;
     errorCode = `DATABASE_${err.code}`;
@@ -50,6 +50,21 @@ export function globalErrorHandler(err, req, res, next) {
       statusCode = 404;
       errorCode = "RECORD_NOT_FOUND";
       message = "Data sasaran tidak ditemukan di database";
+    }
+  } else if (
+    (err.code && typeof err.code === "string" && /^\d{5}$/.test(err.code)) ||
+    err.driverAdapterError?.cause?.code
+  ) {
+    const sqlCode = err.driverAdapterError?.cause?.code || err.code;
+    const sqlMsg = err.driverAdapterError?.cause?.message || err.message;
+    if (sqlCode === "23505") {
+      statusCode = 409;
+      errorCode = "DUPLICATE_ENTRY";
+      message = "Data yang dimasukkan bertabrakan dengan data yang sudah ada";
+    } else if (["23503", "23514", "23000"].includes(sqlCode)) {
+      statusCode = 400;
+      errorCode = "DATABASE_CONSTRAINT_VIOLATION";
+      message = sqlMsg || "Pelanggaran aturan integritas database";
     }
   }
 

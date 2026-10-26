@@ -173,7 +173,7 @@ export async function updateUser(id, data, actorId, req) {
   if (data.role !== undefined) updateData.role = data.role;
   if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
-  if (data.password && data.password.trim().length >= 6) {
+  if (data.password && data.password.trim().length >= 8) {
     updateData.passwordHash = await bcrypt.hash(data.password.trim(), BCRYPT_ROUNDS);
   }
 

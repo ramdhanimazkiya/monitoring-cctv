@@ -59,9 +59,6 @@
               <Lock class="w-3 h-3 text-rose-400" />
               Target Terkunci (Sedang Siaran)
             </span>
-            <span v-else class="text-[10px] font-mono text-slate-500">
-              Bisa dibuka-tutup per zona
-            </span>
           </template>
 
           <div class="space-y-3">
@@ -400,36 +397,11 @@
               </p>
             </div>
 
-            <!-- Live Audio VU Meter (Level Indikator Suara 16kHz) -->
-            <div class="w-full max-w-md mt-2 pt-4 border-t border-[#1e293b] flex flex-col items-center">
-              <div class="w-full flex items-center justify-between text-xs font-mono text-slate-400 mb-2">
-                <span class="flex items-center gap-1.5">
-                  <Activity class="w-3.5 h-3.5 text-blue-400" />
-                  <span>Mic Meter (16 kHz Mono):</span>
-                </span>
-                <span :class="isTransmitting ? 'text-emerald-400 font-bold' : 'text-slate-500'">
-                  {{ isTransmitting ? `${whipAudio.audioLevel.value}%` : '0%' }}
-                </span>
-              </div>
-
-              <!-- 24-Segment VU Meter Bar -->
-              <div class="w-full grid grid-cols-24 gap-1 h-3.5 bg-[#111827] p-0.5 rounded border border-[#283548]">
-                <div
-                  v-for="bar in 24"
-                  :key="bar"
-                  :class="[
-                    'h-full rounded-xs transition-colors duration-75',
-                    getBarColor(bar)
-                  ]"
-                ></div>
-              </div>
-            </div>
-
             <!-- Spacebar Shortcut Hint -->
-            <div class="mt-4 flex items-center justify-between w-full max-w-md pt-2 text-xs font-mono text-slate-400">
-              <span class="text-[11px] text-slate-400 bg-[#151d2e] px-2.5 py-1 rounded border border-[#283548]">
+            <div class="w-full max-w-md mt-4 pt-4 border-t border-[#1e293b] flex items-center justify-between text-xs font-mono text-slate-400">
+              <!-- <span class="text-[11px] text-slate-400 bg-[#151d2e] px-2.5 py-1 rounded border border-[#283548]">
                 Pintasan Toggle: <kbd class="text-slate-200 font-bold font-mono">SPASI</kbd>
-              </span>
+              </span> -->
               <span class="text-[11px] text-slate-500 font-mono">
                 Deduplikasi: {{ selectedEndpoints.length }} endpoint unik
               </span>
@@ -459,7 +431,7 @@
                     <span class="text-[10px] text-slate-500 font-mono">({{ spk.id }})</span>
                   </div>
                   <span class="text-[10px] text-slate-400 block mt-0.5">
-                    {{ spk.zoneName || 'Zona Standar' }}
+                    {{ getSpeakerZoneName(spk) }}
                   </span>
                 </div>
 
@@ -507,7 +479,7 @@
             </div>
             <div class="flex items-center justify-between">
               <span class="text-slate-400">Media Gateway:</span>
-              <span class="text-slate-200 font-medium truncate max-w-[180px]">stream.zakuyu.fun</span>
+              <span class="text-slate-200 font-medium truncate max-w-[180px]">{{ STREAM_RTSP_HOST }}</span>
             </div>
           </div>
         </Card>
@@ -565,6 +537,7 @@ const toast = useToast()
 const whipAudio = useWhipAudio()
 const audioStore = useAudioDevicesStore()
 const cctvStore = useCctvStore()
+import { STREAM_RTSP_HOST } from '../config/stream.js'
 
 // Selected speaker IDs (Array of string ID, e.g. ['AUD-0001', 'AUD-0002'])
 // Default: Kosong (tidak otomatis memilih semua speaker)
@@ -579,13 +552,24 @@ const avgLatency = ref(null)
 const sessionLogs = ref([])
 let autoPingTimer = null
 
-// Group active speakers dynamically by zone
+// Resolves zone name for a speaker, defaulting to 'unassigned' when without zone
+function getSpeakerZoneName(spk) {
+  if (spk.zoneName && spk.zoneName !== '-') return spk.zoneName
+  if (spk.zoneId && spk.zoneId !== '-') {
+    const matched = cctvStore.zones.find(z => z.id === spk.zoneId)
+    return matched?.name || spk.zoneId
+  }
+  return 'unassigned'
+}
+
+// Group active speakers dynamically by zone (speakers without zone grouped under 'unassigned')
 const zoneGroups = computed(() => {
   const map = new Map()
 
   audioStore.activeDevices.forEach((spk) => {
-    const zoneKey = spk.zoneId || spk.zoneName || 'DEFAULT_ZONE'
-    const zoneName = spk.zoneName && spk.zoneName !== '-' ? spk.zoneName : (spk.zoneId || 'Zona Standar')
+    const hasValidZone = (spk.zoneId && spk.zoneId !== '-') || (spk.zoneName && spk.zoneName !== '-')
+    const zoneKey = hasValidZone ? (spk.zoneId || spk.zoneName) : 'unassigned'
+    const zoneName = hasValidZone ? getSpeakerZoneName(spk) : 'unassigned'
 
     if (!map.has(zoneKey)) {
       map.set(zoneKey, {
@@ -597,7 +581,7 @@ const zoneGroups = computed(() => {
     map.get(zoneKey).speakers.push(spk)
   })
 
-  return Array.from(map.values()).map((group) => {
+  const groups = Array.from(map.values()).map((group) => {
     const total = group.speakers.length
     const selectedCount = group.speakers.filter(s => selectedSpeakerIds.value.includes(s.id)).length
     const isAllChecked = total > 0 && selectedCount === total
@@ -610,6 +594,12 @@ const zoneGroups = computed(() => {
       isAllChecked,
       isPartial
     }
+  })
+
+  return groups.sort((a, b) => {
+    if (a.key === 'unassigned') return 1
+    if (b.key === 'unassigned') return -1
+    return a.name.localeCompare(b.name)
   })
 })
 
@@ -742,19 +732,9 @@ function formatEndpoint(url) {
 
 function formatRtsp(url) {
   if (!url) return '-'
-  return url.replace('rtsp://stream.zakuyu.fun:8554/', '')
+  return url.replace(/^rtsp:\/\/[^/]+\//, '')
 }
 
-// Visualizer helper for 24-segment VU meter
-function getBarColor(barIndex) {
-  const percentage = (barIndex / 24) * 100
-  if (percentage > whipAudio.audioLevel.value) {
-    return 'bg-[#151f30]'
-  }
-  if (barIndex > 19) return 'bg-rose-500 shadow-xs shadow-rose-500/50'
-  if (barIndex > 14) return 'bg-amber-400'
-  return 'bg-emerald-400'
-}
 
 // Ping Gateway: Otomatis tiap 10 detik & manual trigger
 async function executePing({ silent = false } = {}) {
@@ -857,7 +837,7 @@ async function startCurrentTransmission() {
 
   const spkCount = selectedSpeakers.value.length
   const streamCount = selectedEndpoints.value.length
-  const zoneCount = new Set(selectedSpeakers.value.map(s => s.zoneName || s.zoneId)).size
+  const zoneCount = new Set(selectedSpeakers.value.map(s => getSpeakerZoneName(s))).size
 
   toast.info(
     'Menghubungkan WHIP WebRTC',
@@ -879,7 +859,7 @@ function stopCurrentTransmission() {
     const mins = Math.floor(finalSec / 60).toString().padStart(2, '0')
     const secs = (finalSec % 60).toString().padStart(2, '0')
     const spkCount = selectedSpeakers.value.length
-    const zoneCount = new Set(selectedSpeakers.value.map(s => s.zoneName || s.zoneId)).size
+    const zoneCount = new Set(selectedSpeakers.value.map(s => getSpeakerZoneName(s))).size
 
     sessionLogs.value.unshift({
       target: `${spkCount} Speaker (${zoneCount} Zona)`,
@@ -905,7 +885,10 @@ function handleKeyDown(e) {
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeyDown)
-  await cctvStore.fetchSitesAndZones()
+  await Promise.all([
+    cctvStore.fetchSitesAndZones(),
+    audioStore.fetchAudioDevices()
+  ])
 
   // Default: Kosongkan seleksi (tidak auto-select semua speaker)
   // Jalankan ping awal secara hening (silent)

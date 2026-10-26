@@ -93,6 +93,8 @@ const audioDeviceShape = {
   port: z.number().int().min(1).max(65535).optional().nullable(),
   adapterType: z.string().trim().max(30).default("mock"),
   adapterConfig: z.record(z.any()).optional().nullable(),
+  whipUrl: z.string().trim().max(500).optional().nullable(),
+  volume: z.number().int().min(0).max(100).optional().nullable(),
   credential: z.string().optional().nullable(),
   supportsPtt: z.boolean().default(false),
   supportsTts: z.boolean().default(false),

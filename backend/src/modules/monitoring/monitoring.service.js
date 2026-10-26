@@ -3,6 +3,7 @@ import { logger } from "../../utils/logger.js";
 import { wsHub } from "../../websocket/hub.js";
 import { pingDevice } from "./monitoring.adapter.js";
 import { checkCameraStream } from "../streaming/streaming.service.js";
+import { gatewayAdapter } from "../streaming/gateway.adapter.js";
 
 class DeviceMonitoringService {
   constructor() {
@@ -135,9 +136,21 @@ class DeviceMonitoringService {
 
       if (allDevices.length > 0) {
         logger.debug(`Memulai pemeriksaan status untuk ${allDevices.length} perangkat`);
-        // Jalankan pemeriksaan paralel dengan pembatasan
-        for (const device of allDevices) {
-          await this.checkDevice(device);
+        // Periksa kesehatan MediaMTX sekali per cycle (digunakan untuk evaluasi status audio)
+        let gatewayHealth = null;
+        try {
+          gatewayHealth = await gatewayAdapter.getGatewayHealth();
+        } catch (_) {
+          gatewayHealth = { connected: false, latencyMs: null };
+        }
+
+        // Jalankan pemeriksaan paralel terkontrol (batching 8 perangkat serentak)
+        const BATCH_SIZE = 8;
+        for (let i = 0; i < allDevices.length; i += BATCH_SIZE) {
+          const batch = allDevices.slice(i, i + BATCH_SIZE);
+          await Promise.allSettled(
+            batch.map((device) => this.checkDevice(device, gatewayHealth)),
+          );
         }
       }
     } catch (err) {
@@ -150,7 +163,7 @@ class DeviceMonitoringService {
   /**
    * Memeriksa satu perangkat, menghitung transisi status, dan mencatat histori/alarm jika berubah.
    */
-  async checkDevice(device) {
+  async checkDevice(device, gatewayHealth = null) {
     const isCamera = device.type === "CAMERA";
     const now = new Date();
     const fromStatus = device.status;
@@ -174,10 +187,34 @@ class DeviceMonitoringService {
     }
 
     let pingResult;
-    try {
-      pingResult = await pingDevice(device, this.settings.timeoutMs);
-    } catch (err) {
-      pingResult = { ok: false, latencyMs: 0, reason: err.message };
+    if (!isCamera) {
+      // Audio: status online/offline dilihat murni dari apakah MediaMTX berjalan
+      let health = gatewayHealth;
+      if (!health) {
+        try {
+          health = await gatewayAdapter.getGatewayHealth();
+        } catch (_) {
+          health = { connected: false, latencyMs: null };
+        }
+      }
+
+      const isUp = Boolean(health && health.connected);
+      const latencyMs = isUp ? (health.latencyMs || 25) : 0;
+
+      pingResult = {
+        ok: isUp,
+        latencyMs,
+        reason: isUp
+          ? "MediaMTX Gateway aktif (Audio Siaga)"
+          : "MediaMTX Gateway tidak dapat dihubungi (Audio Offline)",
+        details: { protocol: "MediaMTX", connected: isUp },
+      };
+    } else {
+      try {
+        pingResult = await pingDevice(device, this.settings.timeoutMs);
+      } catch (err) {
+        pingResult = { ok: false, latencyMs: 0, reason: err.message };
+      }
     }
 
     let toStatus = fromStatus;
@@ -191,9 +228,9 @@ class DeviceMonitoringService {
       this.consecutiveSuccesses.set(device.id, consecutiveSuccess);
       nextFailures = 0;
 
-      if (fromStatus === "UNKNOWN") {
+      if (fromStatus === "UNKNOWN" || !isCamera) {
         toStatus = "ONLINE";
-        statusReason = "Pemeriksaan awal berhasil";
+        statusReason = !isCamera ? pingResult.reason : "Pemeriksaan awal berhasil";
       } else if (fromStatus === "OFFLINE" || fromStatus === "WARNING") {
         if (consecutiveSuccess >= this.settings.recoverAfterSuccesses) {
           toStatus = "ONLINE";
@@ -239,6 +276,46 @@ class DeviceMonitoringService {
         await prisma.camera.update({ where: { id: device.id }, data: updateData });
       } else {
         await prisma.audioDevice.update({ where: { id: device.id }, data: updateData });
+      }
+
+      // Jika perangkat berstatus ONLINE, otomatis selesaikan (RESOLVED) seluruh alarm OFFLINE yang masih terbuka
+      if (toStatus === "ONLINE") {
+        const openAlarms = await prisma.event.findMany({
+          where: {
+            status: { in: ["OPEN", "ACKNOWLEDGED"] },
+            OR: [{ cameraId: device.id }, { audioDeviceId: device.id }],
+          },
+        });
+
+        if (openAlarms.length > 0) {
+          const resolutionNote = isCamera
+            ? "Kamera pulih otomatis kembali ONLINE (Stream aktif)"
+            : "Speaker audio pulih otomatis kembali ONLINE (MediaMTX Gateway aktif)";
+
+          await prisma.event.updateMany({
+            where: {
+              id: { in: openAlarms.map((a) => a.id) },
+            },
+            data: {
+              status: "RESOLVED",
+              resolvedAt: now,
+              resolutionNote,
+            },
+          });
+
+          for (const alarm of openAlarms) {
+            wsHub.broadcastEventAlarm({
+              id: String(alarm.id),
+              type: alarm.type,
+              severity: "INFO",
+              status: "RESOLVED",
+              title: alarm.title,
+              message: resolutionNote,
+              deviceId: device.id,
+              timestamp: now,
+            });
+          }
+        }
       }
 
       // Jika terjadi perubahan status: catat append-only history, alarm event, dan broadcast via WebSocket
@@ -289,21 +366,6 @@ class DeviceMonitoringService {
             message: event.message,
             deviceId: device.id,
             timestamp: now,
-          });
-        }
-
-        // 3. Jika perangkat pulih kembali ONLINE, otomatis selesaikan (RESOLVED) alarm OFFLINE terbuka
-        if (toStatus === "ONLINE" && fromStatus === "OFFLINE") {
-          await prisma.event.updateMany({
-            where: {
-              status: { in: ["OPEN", "ACKNOWLEDGED"] },
-              OR: [{ cameraId: device.id }, { audioDeviceId: device.id }],
-            },
-            data: {
-              status: "RESOLVED",
-              resolvedAt: now,
-              resolutionNote: "Perangkat pulih otomatis kembali ONLINE (Koneksi normal)",
-            },
           });
         }
 

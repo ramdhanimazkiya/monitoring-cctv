@@ -1,22 +1,36 @@
 <template>
   <div class="space-y-6">
     <!-- Top Welcome Bar -->
-    <div class="pb-2 border-b border-[#283548]">
-      <h2 class="text-lg font-bold text-slate-100 tracking-tight">
-        Ringkasan Operasi Monitoring
-      </h2>
-      <p class="text-xs text-slate-400 mt-0.5 font-mono">
-        Data real-time status perangkat CCTV, speaker audio, dan alarm insiden langsung dari database PostgreSQL.
-      </p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#283548]">
+      <div>
+        <h2 class="text-base sm:text-lg font-bold text-slate-100 tracking-tight">
+          Ringkasan Operasi Monitoring
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5 font-mono">
+          Data real-time status perangkat CCTV, speaker audio, dan alarm insiden langsung dari database PostgreSQL.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 self-start sm:self-auto shrink-0">
+        <button
+          type="button"
+          :disabled="loading"
+          class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#131b2c] hover:bg-[#1a253c] text-xs font-mono text-slate-300 border border-[#283548] transition-colors cursor-pointer disabled:opacity-50"
+          title="Sinkronkan data ringkasan"
+          @click="refreshAllData"
+        >
+          <RefreshCw :class="['w-3.5 h-3.5 text-blue-400', loading ? 'animate-spin' : '']" />
+          <span>{{ loading ? 'Sinkronisasi...' : 'Sinkronkan Data' }}</span>
+        </button>
+      </div>
     </div>
 
     <!-- METRIK OPERASI MONITORING: CCTV, AUDIO, EVENT & ALARM, SITE & ZONE -->
     <div class="space-y-3">
       <!-- Rekap CCTV & Audio -->
-      <div class="bg-[#0d131f] hover:bg-[#0f1726] border border-[#1e2a3b] hover:border-[#28384f] rounded-xl p-3.5 font-mono text-xs shadow-xs transition-all duration-200">
+      <div class="bg-[#0d131f] hover:bg-[#0f1726] border border-[#1e2a3b] hover:border-[#28384f] rounded-xl p-3 sm:p-3.5 font-mono text-xs shadow-xs transition-all duration-200">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-[#1e2a3b]">
           <!-- Kolom 1: Kamera CCTV -->
-          <div class="flex items-center justify-between pr-0 md:pr-6 group">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-0 md:pr-6 group">
             <div class="flex items-center gap-2.5">
               <div class="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0 group-hover:bg-blue-500/30 group-hover:border-blue-400/60 group-hover:text-blue-300 transition-all duration-200">
                 <Video class="w-4 h-4" />
@@ -26,27 +40,27 @@
                 <span class="text-[11px] text-slate-300">Total: <strong class="text-slate-100 font-bold">{{ stats.cctv.total }}</strong> Unit Kamera</span>
               </div>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 bg-[#111827]/70 sm:bg-transparent p-2 sm:p-0 rounded-lg sm:rounded-none border border-[#1e2a3b]/60 sm:border-0">
               <div class="text-right">
                 <span class="text-[10px] text-slate-400 block">Online:</span>
-                <span class="text-base font-bold text-emerald-400 flex items-center justify-end gap-1.5">
+                <span class="text-sm sm:text-base font-bold text-emerald-400 flex items-center justify-end gap-1.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                   {{ stats.cctv.online }}
                 </span>
               </div>
-              <div class="h-7 w-px bg-[#1e2a3b]"></div>
+              <div class="h-6 sm:h-7 w-px bg-[#1e2a3b]"></div>
               <div class="text-right">
                 <span class="text-[10px] text-slate-400 block">Offline:</span>
-                <span class="text-base font-bold text-rose-400 flex items-center justify-end gap-1.5">
+                <span class="text-sm sm:text-base font-bold text-rose-400 flex items-center justify-end gap-1.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
                   {{ stats.cctv.offline }}
                 </span>
               </div>
               <template v-if="stats.cctv.unknown">
-                <div class="h-7 w-px bg-[#1e2a3b]"></div>
+                <div class="h-6 sm:h-7 w-px bg-[#1e2a3b]"></div>
                 <div class="text-right">
                   <span class="text-[10px] text-slate-400 block">Unknown:</span>
-                  <span class="text-base font-bold text-slate-400 flex items-center justify-end gap-1.5">
+                  <span class="text-sm sm:text-base font-bold text-slate-400 flex items-center justify-end gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                     {{ stats.cctv.unknown }}
                   </span>
@@ -56,7 +70,7 @@
           </div>
 
           <!-- Kolom 2: Audio Speakers -->
-          <div class="flex items-center justify-between pt-3 md:pt-0 pl-0 md:pl-6 group">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 md:pt-0 pl-0 md:pl-6 group">
             <div class="flex items-center gap-2.5">
               <div class="w-8 h-8 rounded-lg bg-purple-600/20 border border-purple-500/40 flex items-center justify-center text-purple-400 shrink-0 group-hover:bg-purple-500/30 group-hover:border-purple-400/60 group-hover:text-purple-300 transition-all duration-200">
                 <Volume2 class="w-4 h-4" />
@@ -66,27 +80,27 @@
                 <span class="text-[11px] text-slate-300">Total: <strong class="text-slate-100 font-bold">{{ stats.audio.total }}</strong> Unit Speaker</span>
               </div>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 bg-[#111827]/70 sm:bg-transparent p-2 sm:p-0 rounded-lg sm:rounded-none border border-[#1e2a3b]/60 sm:border-0">
               <div class="text-right">
                 <span class="text-[10px] text-slate-400 block">Online:</span>
-                <span class="text-base font-bold text-emerald-400 flex items-center justify-end gap-1.5">
+                <span class="text-sm sm:text-base font-bold text-emerald-400 flex items-center justify-end gap-1.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                   {{ stats.audio.online }}
                 </span>
               </div>
-              <div class="h-7 w-px bg-[#1e2a3b]"></div>
+              <div class="h-6 sm:h-7 w-px bg-[#1e2a3b]"></div>
               <div class="text-right">
                 <span class="text-[10px] text-slate-400 block">Offline:</span>
-                <span class="text-base font-bold text-rose-400 flex items-center justify-end gap-1.5">
+                <span class="text-sm sm:text-base font-bold text-rose-400 flex items-center justify-end gap-1.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
                   {{ stats.audio.offline }}
                 </span>
               </div>
               <template v-if="stats.audio.unknown">
-                <div class="h-7 w-px bg-[#1e2a3b]"></div>
+                <div class="h-6 sm:h-7 w-px bg-[#1e2a3b]"></div>
                 <div class="text-right">
                   <span class="text-[10px] text-slate-400 block">Unknown:</span>
-                  <span class="text-base font-bold text-slate-400 flex items-center justify-end gap-1.5">
+                  <span class="text-sm sm:text-base font-bold text-slate-400 flex items-center justify-end gap-1.5">
                     <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                     {{ stats.audio.unknown }}
                   </span>
@@ -98,10 +112,10 @@
       </div>
 
       <!-- Rekap Event & Alarm serta Site & Zone -->
-      <div class="bg-[#0d131f] hover:bg-[#0f1726] border border-[#1e2a3b] hover:border-[#28384f] rounded-xl p-3.5 font-mono text-xs shadow-xs transition-all duration-200">
+      <div class="bg-[#0d131f] hover:bg-[#0f1726] border border-[#1e2a3b] hover:border-[#28384f] rounded-xl p-3 sm:p-3.5 font-mono text-xs shadow-xs transition-all duration-200">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 divide-y md:divide-y-0 md:divide-x divide-[#1e2a3b]">
           <!-- Kolom 1: Event & Alarm -->
-          <div class="flex items-center justify-between pr-0 md:pr-6 group">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-0 md:pr-6 group">
             <div class="flex items-center gap-2.5">
               <div class="w-8 h-8 rounded-lg bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0 group-hover:bg-rose-500/30 group-hover:border-rose-400/60 group-hover:text-rose-300 transition-all duration-200">
                 <AlertTriangle class="w-4 h-4" />
@@ -111,10 +125,10 @@
                 <span class="text-[11px] text-slate-300">Histori {{ eventsStore.stats.total }} Insiden Tercatat</span>
               </div>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 bg-[#111827]/70 sm:bg-transparent p-2 sm:p-0 rounded-lg sm:rounded-none border border-[#1e2a3b]/60 sm:border-0">
               <div class="text-right">
                 <span class="text-[10px] text-slate-400 block">Aktif (Kritis):</span>
-                <span class="text-base font-bold text-rose-400 flex items-center justify-end gap-1.5">
+                <span class="text-sm sm:text-base font-bold text-rose-400 flex items-center justify-end gap-1.5">
                   <span
                     class="w-1.5 h-1.5 rounded-full bg-rose-400"
                     :class="{ 'animate-ping': eventsStore.stats.offlineActiveCount > 0 }"
@@ -122,10 +136,10 @@
                   {{ eventsStore.stats.offlineActiveCount }}
                 </span>
               </div>
-              <div class="h-7 w-px bg-[#1e2a3b]"></div>
+              <div class="h-6 sm:h-7 w-px bg-[#1e2a3b]"></div>
               <div class="text-right">
                 <span class="text-[10px] text-slate-400 block">Pulih (Resolved):</span>
-                <span class="text-base font-bold text-emerald-400 flex items-center justify-end gap-1.5">
+                <span class="text-sm sm:text-base font-bold text-emerald-400 flex items-center justify-end gap-1.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                   {{ eventsStore.stats.resolvedCount }}
                 </span>
@@ -134,7 +148,7 @@
           </div>
 
           <!-- Kolom 2: Site & Zone -->
-          <div class="flex items-center justify-between pt-3 md:pt-0 pl-0 md:pl-6 group">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 md:pt-0 pl-0 md:pl-6 group">
             <div class="flex items-center gap-2.5">
               <div class="w-8 h-8 rounded-lg bg-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0 group-hover:bg-amber-500/30 group-hover:border-amber-400/60 group-hover:text-amber-300 transition-all duration-200">
                 <MapPin class="w-4 h-4" />
@@ -144,18 +158,18 @@
                 <span class="text-[11px] text-slate-300">Hierarki Fasilitas & Area</span>
               </div>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 bg-[#111827]/70 sm:bg-transparent p-2 sm:p-0 rounded-lg sm:rounded-none border border-[#1e2a3b]/60 sm:border-0">
               <div class="text-right">
                 <span class="text-[10px] text-slate-400 block">Total Site:</span>
-                <span class="text-base font-bold text-amber-400 flex items-center justify-end gap-1.5">
+                <span class="text-sm sm:text-base font-bold text-amber-400 flex items-center justify-end gap-1.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                   {{ cctvStore.sites.length }} Site
                 </span>
               </div>
-              <div class="h-7 w-px bg-[#1e2a3b]"></div>
+              <div class="h-6 sm:h-7 w-px bg-[#1e2a3b]"></div>
               <div class="text-right">
                 <span class="text-[10px] text-slate-400 block">Total Zona:</span>
-                <span class="text-base font-bold text-indigo-400 flex items-center justify-end gap-1.5">
+                <span class="text-sm sm:text-base font-bold text-indigo-400 flex items-center justify-end gap-1.5">
                   <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
                   {{ cctvStore.zones.length }} Zona
                 </span>
@@ -167,40 +181,44 @@
     </div>
 
     <!-- Center Section: Device Map (Left 7 cols) & Device Management Overview (Right 5 cols) -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      <!-- Device Location Map  -->
-      <div class="lg:col-span-7">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+      <!-- Device Location Map (7 cols) -->
+      <div class="lg:col-span-7 flex flex-col">
         <Card
-          title="Peta Lokasi Perangkat "
+          title="Peta Lokasi Perangkat"
           subtitle="Pemantauan live streaming CCTV terintegrasi dengan pemetaan geospasial Leaflet OpenStreetMap."
+          class="h-full flex flex-col"
         >
-          <!-- <template #actions>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/70 border border-emerald-800 text-emerald-300">
-              Leaflet Engine
-            </span>
-          </template> -->
-          <div class="h-80 w-full">
-            <DeviceMap :devices="displayedMapDevices" navigate-on-select />
+          <div class="w-full flex-1 min-h-[320px] relative">
+            <div class="absolute inset-0">
+              <DeviceMap :devices="displayedMapDevices" navigate-on-select />
+            </div>
           </div>
           <template #footer>
-            <div class="flex items-center justify-between w-full text-[11px] font-mono text-slate-400">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 w-full text-[11px] font-mono text-slate-400">
               <span>{{ displayedMapDevices.length }} Perangkat Berkoordinat Valid</span>
-              <router-link to="/cctv" class="text-blue-400 hover:underline">
-                Buka Semua Kamera →
+              <router-link to="/cctv" class="text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1 font-semibold">
+                <span>Buka Semua Kamera</span>
+                <span>→</span>
               </router-link>
             </div>
           </template>
         </Card>
       </div>
 
-      <!-- Device Management Section (Replacing System Services) -->
-      <div class="lg:col-span-5 space-y-4">
-        <Card title="Inventaris Perangkat" subtitle="Status operasional kamera CCTV & audio paging">
-          <div class="flex items-center gap-1 mb-3 bg-[#111827] p-1 rounded-lg border border-[#283548] text-xs font-mono">
+      <!-- Right Column: Inventaris Perangkat (Max 4) & Emergency Audio Paging (5 cols) -->
+      <div class="lg:col-span-5 flex flex-col gap-4">
+        <!-- Inventaris Perangkat (Maksimal 4 perangkat ditampilkan) -->
+        <Card
+          title="Inventaris Perangkat"
+          subtitle="Status operasional kamera CCTV & audio paging"
+          class="flex-1 flex flex-col"
+        >
+          <div class="flex items-center gap-1 mb-3 bg-[#111827] p-1 rounded-lg border border-[#283548] text-xs font-mono shrink-0">
             <button
               type="button"
               :class="[
-                'flex-1 py-1 px-2 rounded font-semibold text-center transition-colors cursor-pointer',
+                'flex-1 py-1 px-1 sm:px-2 rounded font-semibold text-center transition-colors cursor-pointer text-[11px] sm:text-xs',
                 deviceFilter === 'ALL' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
               ]"
               @click="deviceFilter = 'ALL'"
@@ -210,7 +228,7 @@
             <button
               type="button"
               :class="[
-                'flex-1 py-1 px-2 rounded font-semibold text-center transition-colors cursor-pointer',
+                'flex-1 py-1 px-1 sm:px-2 rounded font-semibold text-center transition-colors cursor-pointer text-[11px] sm:text-xs',
                 deviceFilter === 'CCTV' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
               ]"
               @click="deviceFilter = 'CCTV'"
@@ -220,7 +238,7 @@
             <button
               type="button"
               :class="[
-                'flex-1 py-1 px-2 rounded font-semibold text-center transition-colors cursor-pointer',
+                'flex-1 py-1 px-1 sm:px-2 rounded font-semibold text-center transition-colors cursor-pointer text-[11px] sm:text-xs',
                 deviceFilter === 'AUDIO' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-slate-200'
               ]"
               @click="deviceFilter = 'AUDIO'"
@@ -229,21 +247,21 @@
             </button>
           </div>
 
-          <!-- Device List (Scrollable) -->
-          <div class="space-y-2 max-h-[220px] overflow-y-auto pr-0.5 font-mono">
+          <!-- Device List (Maksimal 4 perangkat ditampilkan) -->
+          <div class="space-y-2 font-mono flex-1">
             <div
-              v-if="allManagedDevices.length === 0"
-              class="p-4 text-center text-slate-500 text-xs"
+              v-if="displayedManagedDevices.length === 0"
+              class="p-4 text-center text-slate-500 text-xs bg-[#0e1422] rounded-lg border border-[#1e2a3b]"
             >
               Belum ada perangkat dalam kategori ini.
             </div>
 
             <div
-              v-for="dev in allManagedDevices"
+              v-for="dev in displayedManagedDevices"
               :key="dev.id"
               class="p-2.5 rounded-lg bg-[#151d2e] border border-[#283548] flex items-center justify-between hover:border-slate-600 transition-colors"
             >
-              <div class="flex items-center gap-2.5 truncate">
+              <div class="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                 <div
                   :class="[
                     'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border',
@@ -255,14 +273,14 @@
                   <Video v-if="dev.type === 'CCTV'" class="w-4 h-4" />
                   <Volume2 v-else class="w-4 h-4" />
                 </div>
-                <div class="truncate">
-                  <div class="flex items-center gap-1.5">
-                    <span class="font-bold text-xs text-slate-200">{{ dev.id }}</span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="font-bold text-xs text-slate-200 truncate">{{ dev.id }}</span>
                     <span class="text-[10px] text-slate-400 font-sans truncate">({{ dev.name }})</span>
                   </div>
                   <div class="text-[10px] text-slate-400 flex items-center gap-1 truncate mt-0.5">
                     <MapPin class="w-3 h-3 text-slate-500 shrink-0" />
-                    <span>{{ [dev.siteName, dev.zoneName].filter(Boolean).join(' • ') }}</span>
+                    <span class="truncate">{{ [dev.siteName, dev.zoneName].filter(Boolean).join(' • ') }}</span>
                   </div>
                 </div>
               </div>
@@ -281,22 +299,49 @@
           </div>
 
           <template #footer>
-            <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 w-full">
-              <span>Inventaris: {{ cctvStore.activeCameras.length }} CCTV • {{ audioStore.activeDevices.length }} Audio</span>
-              <router-link to="/devices" class="text-blue-400 hover:underline">
-                Kelola Perangkat →
+            <div class="flex items-center justify-between gap-2 text-[11px] font-mono text-slate-400 w-full">
+              <!-- Pagination Perangkat (Kecil / Kompak) -->
+              <div class="flex items-center gap-1">
+                <button
+                  type="button"
+                  :disabled="devicePage <= 1"
+                  class="w-6 h-6 flex items-center justify-center rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  title="Halaman Sebelumnya"
+                  @click="devicePage--"
+                >
+                  <ChevronLeft class="w-3.5 h-3.5" />
+                </button>
+
+                <span class="px-1.5 py-0.5 text-[10px] text-slate-300 bg-[#0d131f] border border-[#283548] rounded font-semibold min-w-[32px] text-center">
+                  {{ devicePage }}/{{ deviceTotalPages }}
+                </span>
+
+                <button
+                  type="button"
+                  :disabled="devicePage >= deviceTotalPages"
+                  class="w-6 h-6 flex items-center justify-center rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  title="Halaman Selanjutnya"
+                  @click="devicePage++"
+                >
+                  <ChevronRight class="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <router-link to="/devices" class="text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1 font-semibold text-[11px]">
+                <span>Kelola Semua Perangkat</span>
+                <span>→</span>
               </router-link>
             </div>
           </template>
         </Card>
 
-        <!-- Emergency Audio Paging (Locks 100% Registered Speakers, Minimal & Non-Intrusive) -->
-        <div class="p-3.5 rounded-xl bg-gradient-to-br from-[#120f18] via-[#0d121d] to-[#0a0f1a] border border-rose-900/50 shadow-md space-y-3 relative overflow-hidden border-t-2 border-t-rose-500/70">
+        <!-- Emergency Audio Paging (Minimal, Non-Intrusive, Safe with Confirmation Alert) -->
+        <div class="p-3.5 rounded-xl bg-gradient-to-br from-[#120f18] via-[#0d121d] to-[#0a0f1a] border border-rose-900/50 shadow-md space-y-3 relative overflow-hidden border-t-2 border-t-rose-500/70 shrink-0">
           <!-- Ambient glowing background effect -->
           <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-rose-600/5 rounded-full blur-2xl pointer-events-none"></div>
 
           <!-- Header Bar -->
-          <div class="flex items-center justify-between pb-2 border-b border-[#241a28]">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-[#241a28]">
             <div class="flex items-center gap-2">
               <div class="w-7 h-7 rounded-lg bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
                 <Siren :class="['w-4 h-4', isPagingTransmitting ? 'animate-bounce text-rose-300' : 'animate-pulse text-rose-400']" />
@@ -321,14 +366,14 @@
             </div>
 
             <!-- Right: Auto-Ping status + Link to full console -->
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 self-end sm:self-auto">
               <span class="text-[10px] font-mono text-slate-400 flex items-center gap-1" title="Ping otomatis tiap 10 detik">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span>{{ avgAudioLatency !== null ? `${avgAudioLatency}ms` : '10s' }}</span>
               </span>
               <router-link
                 to="/audio"
-                class="text-[10px] font-mono text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-0.5"
+                class="text-[10px] font-mono text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-0.5 font-semibold"
                 title="Buka Konsol Audio Paging Penuh (Pilih Per Zona)"
               >
                 <span>Pilih Zona</span>
@@ -337,34 +382,19 @@
             </div>
           </div>
 
-          <!-- Emergency Lock Status Banner -->
-          <!-- <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-[#180f1a] border border-rose-900/40 text-xs font-mono">
-            <div class="flex items-center gap-2 text-rose-300">
-              <Lock class="w-3.5 h-3.5 text-rose-400 shrink-0 animate-pulse" />
-              <div class="text-[11px]">
-                <strong class="text-rose-200">Seluruh {{ totalPagingActive }} Speaker Terkunci</strong>
-                <span class="text-[10px] text-rose-400/80 block sm:inline sm:ml-1 font-normal">(100% Emergency Lock)</span>
-              </div>
-            </div>
-
-            <span class="text-[10px] font-mono text-slate-400 shrink-0">
-              16 kHz Mono
-            </span>
-          </div> -->
-
-          <!-- Emergency Trigger Button -->
+          <!-- Emergency Trigger Button (With Confirmation Prompt) -->
           <button
             type="button"
             :disabled="whipAudio.publishState.value === 'connecting' || whipAudio.publishState.value === 'requesting_mic'"
             :class="[
-              'w-full py-2 px-3 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all select-none shadow-md cursor-pointer active:scale-98',
+              'w-full py-2.5 px-3 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all select-none shadow-md cursor-pointer active:scale-98',
               isPagingTransmitting
                 ? 'bg-rose-600 hover:bg-rose-500 text-white border-2 border-rose-300 shadow-glow-offline animate-pulse ring-4 ring-rose-500/40'
                 : whipAudio.publishState.value === 'connecting'
                 ? 'bg-amber-600 text-white border border-amber-400 animate-pulse'
                 : 'bg-gradient-to-r from-rose-700 via-rose-600 to-red-600 hover:from-rose-600 hover:to-red-500 text-white border border-rose-400/60 shadow-lg shadow-rose-950/40 hover:shadow-rose-900/60'
             ]"
-            @click="toggleEmergencyPaging"
+            @click="handleEmergencyButtonClick"
           >
             <Radio v-if="isPagingTransmitting" class="w-4 h-4 animate-bounce" />
             <Activity v-else-if="whipAudio.publishState.value === 'connecting'" class="w-4 h-4 animate-spin" />
@@ -383,12 +413,13 @@
       </div>
     </div>
 
-    <!-- Bottom Section: Latest Events & Alarms Table (Real Database Data) -->
+    <!-- Bottom Section: Latest Events & Alarms Table (Col 12 / Full Width) -->
     <Card title="Alarm & Insiden Terbaru" subtitle="Monitoring real-time perangkat OFFLINE dan riwayat pemulihan (RESOLVED)">
       <template #actions>
         <router-link to="/events">
           <Button variant="ghost" size="xs">
-            Lihat Histori Lengkap ({{ eventsStore.pagination.total }} Insiden) →
+            <span class="hidden sm:inline">Lihat Histori Lengkap ({{ eventsStore.pagination.total }} Insiden) →</span>
+            <span class="sm:hidden">Histori ({{ eventsStore.pagination.total }}) →</span>
           </Button>
         </router-link>
       </template>
@@ -596,6 +627,70 @@
         </Button>
       </template>
     </Modal>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: KONFIRMASI SIARAN AUDIO DARURAT (ALERT DIALOG)                 -->
+    <!-- ===================================================================== -->
+    <Modal
+      v-model="emergencyConfirmModalOpen"
+      title="Konfirmasi Siaran Audio Darurat"
+      description="Peringatan keselamatan: Operasi ini akan langsung menyiarkan audio serentak."
+      size="md"
+    >
+      <template #icon>
+        <div class="w-9 h-9 rounded-lg bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+          <Siren class="w-5 h-5 animate-pulse text-rose-400" />
+        </div>
+      </template>
+
+      <div class="space-y-4 font-mono text-xs">
+        <div class="p-3.5 rounded-lg bg-rose-950/40 border border-rose-800/60 flex items-start gap-3">
+          <AlertTriangle class="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div class="space-y-1">
+            <strong class="text-rose-200 text-xs block font-sans font-bold">
+              Apakah Anda yakin ingin memulai siaran darurat ke seluruh speaker?
+            </strong>
+            <p class="text-rose-300/90 text-[11px] font-sans leading-relaxed">
+              Mikrofon perangkat Anda akan segera diaktifkan dan transmisi suara Anda disiarkan secara langsung (live broadcast) tanpa jeda ke seluruh speaker aktif di semua lokasi.
+            </p>
+          </div>
+        </div>
+
+        <div class="p-3.5 rounded-lg bg-[#0d131f] border border-[#283548] space-y-2.5">
+          <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block border-b border-[#1e2a3b] pb-1">
+            Ringkasan Target Siaran
+          </span>
+          <div class="grid grid-cols-3 gap-2 text-slate-300 text-[11px]">
+            <span class="text-slate-500">Cakupan Target:</span>
+            <span class="col-span-2 text-slate-100 font-semibold">Seluruh Zona & Site (100% Emergency Lock)</span>
+
+            <span class="text-slate-500">Total Speaker:</span>
+            <span class="col-span-2 text-emerald-400 font-bold flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              {{ totalPagingActive }} Unit Speaker Terdaftar Aktif
+            </span>
+
+            <span class="text-slate-500">Format Sinyal:</span>
+            <span class="col-span-2 text-slate-300">WebRTC WHIP Low-Latency (16 kHz Mono)</span>
+          </div>
+        </div>
+      </div>
+
+      <template #footer="{ close }">
+        <Button variant="secondary" size="sm" @click="close">
+          Batal
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          class="bg-gradient-to-r from-rose-700 via-rose-600 to-red-600 hover:from-rose-600 hover:to-red-500 text-white font-bold border border-rose-400/60 shadow-lg shadow-rose-950/50 flex items-center gap-1.5 cursor-pointer"
+          @click="confirmStartEmergencyPaging"
+        >
+          <Siren class="w-4 h-4 text-white" />
+          <span>Ya, Mulai Siaran Darurat</span>
+        </Button>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -626,16 +721,19 @@ import {
   Activity,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronsDown,
   ChevronsUp,
   Lock,
-  Siren
+  Siren,
+  RefreshCw
 } from '@lucide/vue'
 
 import { useCctvStore } from '../stores/cctv.js'
 import { useAudioDevicesStore } from '../stores/audioDevices.js'
 import { useEventsStore } from '../stores/events.js'
+import { getWhipUrl } from '../config/stream.js'
 
 const toast = useToast()
 const whipAudio = useWhipAudio()
@@ -649,6 +747,7 @@ const deviceFilter = ref('ALL') // 'ALL' | 'CCTV' | 'AUDIO'
 // Emergency Audio Paging State (Dashboard locks 100% registered speakers)
 const avgAudioLatency = ref(null)
 let dashboardPingTimer = null
+const emergencyConfirmModalOpen = ref(false)
 
 const isPagingTransmitting = computed(() => whipAudio.isPublishing.value)
 
@@ -690,23 +789,34 @@ async function executeDashboardAudioPing({ silent = true } = {}) {
   }
 }
 
-// Emergency PTT Broadcast: Automatically locks and publishes to ALL registered speakers
-async function toggleEmergencyPaging() {
-  const allSpeakers = audioStore.activeDevices
-
+// Emergency PTT Broadcast Click Handler
+function handleEmergencyButtonClick() {
   if (isPagingTransmitting.value) {
-    await whipAudio.stopPublish()
-    allSpeakers.forEach(s => audioStore.setTransmissionStatus(s.id, false))
-    toast.info('Siaran Darurat Selesai', 'Siaran audio darurat telah dihentikan.')
-    return
+    stopEmergencyPaging()
+  } else {
+    emergencyConfirmModalOpen.value = true
   }
+}
+
+// Stop Emergency Paging
+async function stopEmergencyPaging() {
+  const allSpeakers = audioStore.activeDevices
+  await whipAudio.stopPublish()
+  allSpeakers.forEach(s => audioStore.setTransmissionStatus(s.id, false))
+  toast.info('Siaran Darurat Selesai', 'Siaran audio darurat telah dihentikan.')
+}
+
+// Confirm and Start Emergency Paging Broadcast
+async function confirmStartEmergencyPaging() {
+  emergencyConfirmModalOpen.value = false
+  const allSpeakers = audioStore.activeDevices
 
   if (allSpeakers.length === 0) {
     toast.error('Tidak Ada Speaker', 'Tidak ada perangkat speaker aktif yang terdaftar di sistem.')
     return
   }
 
-  const rawUrls = allSpeakers.map(s => s.whipUrl?.trim() || `https://stream.zakuyu.fun/${s.id}/whip`).filter(Boolean)
+  const rawUrls = allSpeakers.map(s => s.whipUrl?.trim() || getWhipUrl(s.id)).filter(Boolean)
   const uniqueUrls = [...new Set(rawUrls)]
 
   if (uniqueUrls.length === 0) {
@@ -770,6 +880,29 @@ const allManagedDevices = computed(() => {
   return [...cctvs, ...audios]
 })
 
+// Pagination Inventaris Perangkat (Default 4 item per halaman)
+const devicePage = ref(1)
+const devicePageSize = 4
+
+const deviceTotalPages = computed(() => {
+  return Math.ceil(allManagedDevices.value.length / devicePageSize) || 1
+})
+
+const displayedManagedDevices = computed(() => {
+  const start = (devicePage.value - 1) * devicePageSize
+  return allManagedDevices.value.slice(start, start + devicePageSize)
+})
+
+watch(deviceFilter, () => {
+  devicePage.value = 1
+})
+
+watch(deviceTotalPages, (newTotal) => {
+  if (devicePage.value > newTotal) {
+    devicePage.value = Math.max(1, newTotal)
+  }
+})
+
 // Statistics (Live dari status kamera aktif & perangkat audio)
 const stats = computed(() => {
   const activeCams = cctvStore.activeCameras
@@ -830,6 +963,7 @@ async function refreshAllData() {
   try {
     await Promise.all([
       cctvStore.fetchCameras(),
+      audioStore.fetchAudioDevices(),
       cctvStore.fetchSitesAndZones(),
       cctvStore.fetchDeviceStats(),
       eventsStore.fetchStats(),
@@ -876,13 +1010,15 @@ async function confirmResolveEvent() {
 
 onMounted(() => {
   refreshAllData()
-  cctvStore.startCameraStatusPolling(1000)
+  // WebSocket Hub bertindak sebagai pendorong real-time utama (<50ms).
+  // Polling 30 detik berfungsi sebagai safety net / jaring pengaman pasif.
+  cctvStore.startCameraStatusPolling(30000)
 
-  // Auto-ping audio tiap 10 detik di dashboard
+  // Auto-ping audio tiap 30 detik sebagai telemetry fallback
   executeDashboardAudioPing({ silent: true })
   dashboardPingTimer = setInterval(() => {
     executeDashboardAudioPing({ silent: true })
-  }, 10000)
+  }, 30000)
 })
 
 onUnmounted(() => {

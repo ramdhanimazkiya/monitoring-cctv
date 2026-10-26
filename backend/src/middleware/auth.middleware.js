@@ -1,5 +1,4 @@
 import { env } from "../config/env.js";
-import { prisma } from "../config/database.js";
 import { getSessionByToken } from "../modules/auth/auth.service.js";
 import { UnauthorizedError, ForbiddenError } from "../utils/errors.js";
 
@@ -32,29 +31,11 @@ export async function requireAuth(req, res, next) {
   try {
     const token = extractToken(req);
     if (!token) {
-      if (env.NODE_ENV === "development") {
-        const adminUser = await prisma.user.findFirst({ where: { role: "ADMIN", deletedAt: null } });
-        if (adminUser) {
-          req.user = adminUser;
-          req.session = { id: "dev-session", userId: adminUser.id };
-          req.rawSessionToken = "dev-token";
-          return next();
-        }
-      }
       throw new UnauthorizedError("Autentikasi diperlukan. Silakan login terlebih dahulu.");
     }
 
     const sessionData = await getSessionByToken(token);
     if (!sessionData) {
-      if (env.NODE_ENV === "development") {
-        const adminUser = await prisma.user.findFirst({ where: { role: "ADMIN", deletedAt: null } });
-        if (adminUser) {
-          req.user = adminUser;
-          req.session = { id: "dev-session", userId: adminUser.id };
-          req.rawSessionToken = "dev-token";
-          return next();
-        }
-      }
       // Bersihkan cookie yang tidak valid jika ada
       res.clearCookie(env.SESSION_COOKIE_NAME);
       throw new UnauthorizedError("Sesi tidak valid atau telah kedaluwarsa. Silakan login kembali.");

@@ -1,7 +1,7 @@
 <template>
   <div
     :class="[
-      'bg-[#111827] border rounded-lg overflow-hidden transition-shadow duration-200',
+      'bg-[#111827] border rounded-lg overflow-hidden transition-shadow duration-200 flex flex-col',
       highlight ? 'border-blue-500/50 shadow-panel' : 'border-[#283548] shadow-crisp',
       hover ? 'hover:border-slate-600' : ''
     ]"
@@ -9,7 +9,7 @@
     <!-- Header -->
     <div
       v-if="$slots.header || title"
-      class="px-4 py-3 border-b border-[#283548] flex items-center justify-between gap-3 bg-[#131b2c]/60"
+      class="px-4 py-3 border-b border-[#283548] flex items-center justify-between gap-3 bg-[#131b2c]/60 shrink-0"
     >
       <div class="flex items-center gap-2.5 min-w-0">
         <slot name="icon" />
@@ -28,14 +28,14 @@
     </div>
 
     <!-- Body -->
-    <div :class="padding ? 'p-4' : ''">
+    <div :class="[padding ? 'p-4' : '', 'flex-1 min-h-0 flex flex-col', bodyClass]">
       <slot />
     </div>
 
     <!-- Footer -->
     <div
       v-if="$slots.footer"
-      class="px-4 py-2.5 bg-[#0e1422] border-t border-[#283548] text-xs text-slate-400 flex items-center justify-between"
+      class="px-4 py-2.5 bg-[#0e1422] border-t border-[#283548] text-xs text-slate-400 flex items-center justify-between shrink-0"
     >
       <slot name="footer" />
     </div>
@@ -63,6 +63,10 @@ defineProps({
   hover: {
     type: Boolean,
     default: false
+  },
+  bodyClass: {
+    type: String,
+    default: ''
   }
 })
 </script>

@@ -17,4 +17,18 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/hls.js')) {
+            return 'vendor-hls'
+          }
+          if (id.includes('node_modules/leaflet')) {
+            return 'vendor-leaflet'
+          }
+        },
+      },
+    },
+  },
 })

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth.js'
+import { getWebPlayerUrl, getApiPathUrl } from '../config/stream.js'
 
 export const useCctvStore = defineStore('cctv', () => {
   // Bersihkan cache demo masa lalu jika ada di browser
@@ -178,6 +179,14 @@ export const useCctvStore = defineStore('cctv', () => {
       if (!res.ok || !body.success) {
         throw new Error(body.error?.message || body.message || 'Gagal menghapus zona')
       }
+      // Segera lepaskan penugasan zona pada state kamera lokal
+      cameras.value.forEach((c) => {
+        if (c.zoneId === id) {
+          c.zoneId = null
+          c.zone = null
+          c.zoneName = '-'
+        }
+      })
       await Promise.all([
         fetchSitesAndZones(),
         fetchCameras()
@@ -214,7 +223,7 @@ export const useCctvStore = defineStore('cctv', () => {
             (cam.streamKey && cam.streamKey.startsWith('http')
               ? cam.streamKey
               : cam.streamKey
-              ? `https://stream.zakuyu.fun/${cam.streamKey.replace(/^\//, '').replace(/\/$/, '')}/`
+              ? getWebPlayerUrl(cam.streamKey)
               : null)
 
           return {
@@ -432,7 +441,7 @@ export const useCctvStore = defineStore('cctv', () => {
     try {
       // 1. Direct fetch ke MediaMTX API /v3/paths/get/{name} (murni tanpa JWT karena sudah di-exclude di mediamtx.yml)
       try {
-        const response = await fetch(`https://api.zakuyu.fun/v3/paths/get/${cleanPath}`, {
+        const response = await fetch(getApiPathUrl(cleanPath), {
           cache: 'no-store',
           signal: AbortSignal.timeout(1500)
         })
@@ -518,9 +527,9 @@ export const useCctvStore = defineStore('cctv', () => {
   }
 
   /**
-   * Menjalankan polling status kamera otomatis setiap intervalMs (default 1000ms untuk respons instan)
+   * Menjalankan polling status kamera pasif sebagai fallback WebSocket (default 30 detik)
    */
-  function startCameraStatusPolling(intervalMs = 1000) {
+  function startCameraStatusPolling(intervalMs = 30000) {
     pollingSubscribers++
     if (!cameraStatusInterval || intervalMs < currentPollingInterval) {
       if (cameraStatusInterval) {
@@ -651,6 +660,32 @@ export const useCctvStore = defineStore('cctv', () => {
     }
   }
 
+  /**
+   * Handler real-time event dari WebSocket Hub (device:status_changed)
+   */
+  function handleDeviceStatusChanged(event) {
+    if (!event?.deviceId) return
+    const cam = getCameraById(event.deviceId)
+    if (cam) {
+      if (event.status) cam.status = event.status
+      if (event.streamStatus) cam.streamStatus = event.streamStatus
+      if (event.latencyMs !== undefined) cam.latencyMs = event.latencyMs
+      if (event.reason) cam.statusReason = event.reason
+    }
+  }
+
+  /**
+   * Handler real-time event dari WebSocket Hub (cctv:stream_status)
+   */
+  function handleStreamStatusChanged(event) {
+    if (!event?.cameraId) return
+    const cam = getCameraById(event.cameraId)
+    if (cam) {
+      if (event.streamStatus) cam.streamStatus = event.streamStatus
+      if (event.hardwareStatus) cam.status = event.hardwareStatus
+    }
+  }
+
   return {
     cameras,
     sites,
@@ -683,6 +718,8 @@ export const useCctvStore = defineStore('cctv', () => {
     checkSingleCameraStatus,
     startCameraStatusPolling,
     stopCameraStatusPolling,
+    handleDeviceStatusChanged,
+    handleStreamStatusChanged,
     lastStatusCheckTime,
     extractCameraPath
   }

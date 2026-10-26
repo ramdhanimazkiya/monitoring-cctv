@@ -152,11 +152,17 @@ export async function exportEvents(req, res, next) {
     );
     lines.push("");
 
-    // BAGIAN 2: REKAPITULASI AUDIO PTT
+    // BAGIAN 2: REKAPITULASI AUDIO
     lines.push("# ------------------------------------------------------------------------------");
-    lines.push("# BAGIAN 2: REKAPITULASI AUDIO PTT");
+    lines.push("# BAGIAN 2: REKAPITULASI AUDIO");
     lines.push("# ------------------------------------------------------------------------------");
-    lines.push(["Metrik Audio PTT", "Nilai"].map(escapeCsv).join(","));
+    lines.push(["Metrik Audio", "Nilai"].map(escapeCsv).join(","));
+    lines.push(
+      ["Rata-rata Audio Online", `${recap.audio.onlinePercent ?? 0}%`].map(escapeCsv).join(","),
+    );
+    lines.push(
+      ["Rata-rata Audio Offline", `${recap.audio.offlinePercent ?? 0}%`].map(escapeCsv).join(","),
+    );
     lines.push(["Total PTT", recap.audio.totalPtt].map(escapeCsv).join(","));
     lines.push(["Total Sesi", `${recap.audio.totalSessions} Sesi`].map(escapeCsv).join(","));
     lines.push("");

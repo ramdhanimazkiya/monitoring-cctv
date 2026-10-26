@@ -397,6 +397,8 @@
           label="Pilih Site"
           :placeholder="cctvStore.sites.length ? '-- Pilih Site --' : '-- Belum Ada Site Terdaftar --'"
           :options="siteSelectOptions"
+          :error="zoneErrors.siteId"
+          @change="zoneErrors.siteId = ''"
           required
         />
 
@@ -404,6 +406,8 @@
           v-model="activeZone.name"
           label="Nama Zona"
           placeholder="Contoh: Lobby Utama, Area Parkir Timur, Koridor Lt. 2"
+          :error="zoneErrors.name"
+          @input="zoneErrors.name = ''"
           required
         />
 
@@ -447,6 +451,8 @@
           v-model="activeSite.name"
           label="Nama Site / Gedung"
           placeholder="Contoh: Site A (Pusat Operasi), Site B (Gedung Barat)"
+          :error="siteErrors.name"
+          @input="siteErrors.name = ''"
           required
         />
 
@@ -640,6 +646,24 @@ const activeSite = reactive({
   address: ''
 })
 
+const zoneErrors = reactive({
+  siteId: '',
+  name: ''
+})
+
+const siteErrors = reactive({
+  name: ''
+})
+
+function resetZoneErrors() {
+  zoneErrors.siteId = ''
+  zoneErrors.name = ''
+}
+
+function resetSiteErrors() {
+  siteErrors.name = ''
+}
+
 const siteSelectOptions = computed(() => {
   return cctvStore.sites.map((s) => ({
     value: s.id,
@@ -652,6 +676,7 @@ const siteSelectOptions = computed(() => {
 // -----------------------------------------------------------------------------
 function openCreateZoneModal() {
   zoneModalMode.value = 'create'
+  resetZoneErrors()
   activeZone.id = ''
   activeZone.siteId = (selectedSiteFilter.value !== 'ALL' ? selectedSiteFilter.value : cctvStore.sites[0]?.id) || ''
   activeZone.name = ''
@@ -661,6 +686,7 @@ function openCreateZoneModal() {
 
 function handleEditZone(row) {
   zoneModalMode.value = 'edit'
+  resetZoneErrors()
   activeZone.id = row.id
   activeZone.siteId = row.siteId || ''
   activeZone.name = row.name
@@ -675,12 +701,19 @@ function handleDeleteZone(row) {
 }
 
 async function saveZone() {
-  if (!activeZone.name.trim()) {
-    toast.error('Form Belum Lengkap', 'Nama zona wajib diisi.')
-    return
-  }
+  resetZoneErrors()
+  let hasError = false
+
   if (!activeZone.siteId) {
-    toast.error('Form Belum Lengkap', 'Silakan pilih site terlebih dahulu.')
+    zoneErrors.siteId = 'Silakan pilih site terlebih dahulu.'
+    hasError = true
+  }
+  if (!activeZone.name.trim()) {
+    zoneErrors.name = 'Nama zona wajib diisi.'
+    hasError = true
+  }
+
+  if (hasError) {
     return
   }
 
@@ -693,14 +726,20 @@ async function saveZone() {
   try {
     if (zoneModalMode.value === 'create') {
       const created = await cctvStore.createZone(payload)
+      zoneModalOpen.value = false
       toast.success('Zona Dibuat', `ID otomatis ${created.id} (${created.name}) berhasil disimpan!`)
     } else {
       await cctvStore.updateZone(activeZone.id, payload)
+      zoneModalOpen.value = false
       toast.success('Zona Diperbarui', `Data zona ${activeZone.id} berhasil diperbarui.`)
     }
-    zoneModalOpen.value = false
   } catch (err) {
-    toast.error('Gagal Menyimpan Zona', err.message || 'Terjadi kesalahan')
+    const errMsg = err.message || 'Terjadi kesalahan'
+    if (errMsg.toLowerCase().includes('name') || errMsg.toLowerCase().includes('nama')) {
+      zoneErrors.name = errMsg
+    } else {
+      toast.error('Gagal Menyimpan Zona', errMsg)
+    }
   }
 }
 
@@ -709,6 +748,7 @@ async function saveZone() {
 // -----------------------------------------------------------------------------
 function openCreateSiteModal() {
   siteModalMode.value = 'create'
+  resetSiteErrors()
   activeSite.id = ''
   activeSite.name = ''
   activeSite.description = ''
@@ -718,6 +758,7 @@ function openCreateSiteModal() {
 
 function handleEditSite(site) {
   siteModalMode.value = 'edit'
+  resetSiteErrors()
   activeSite.id = site.id
   activeSite.name = site.name
   activeSite.description = site.description || ''
@@ -732,8 +773,15 @@ function handleDeleteSite(site) {
 }
 
 async function saveSite() {
+  resetSiteErrors()
+  let hasError = false
+
   if (!activeSite.name.trim()) {
-    toast.error('Form Belum Lengkap', 'Nama site wajib diisi.')
+    siteErrors.name = 'Nama site wajib diisi.'
+    hasError = true
+  }
+
+  if (hasError) {
     return
   }
 
@@ -747,14 +795,20 @@ async function saveSite() {
   try {
     if (siteModalMode.value === 'create') {
       const created = await cctvStore.createSite(payload)
+      siteModalOpen.value = false
       toast.success('Site Dibuat', `ID otomatis ${created.id} (${created.name}) berhasil disimpan!`)
     } else {
       await cctvStore.updateSite(activeSite.id, payload)
+      siteModalOpen.value = false
       toast.success('Site Diperbarui', `Data site ${activeSite.id} berhasil diperbarui.`)
     }
-    siteModalOpen.value = false
   } catch (err) {
-    toast.error('Gagal Menyimpan Site', err.message || 'Terjadi kesalahan')
+    const errMsg = err.message || 'Terjadi kesalahan'
+    if (errMsg.toLowerCase().includes('name') || errMsg.toLowerCase().includes('nama')) {
+      siteErrors.name = errMsg
+    } else {
+      toast.error('Gagal Menyimpan Site', errMsg)
+    }
   }
 }
 
@@ -768,6 +822,7 @@ async function confirmDelete() {
   try {
     if (deleteType.value === 'ZONE') {
       await cctvStore.deleteZone(toDeleteTarget.value.id)
+      await audioStore.fetchAudioDevices()
       if (zoneCurrentPage.value > zoneTotalPages.value) {
         zoneCurrentPage.value = Math.max(1, zoneTotalPages.value)
       }
@@ -787,7 +842,8 @@ async function confirmDelete() {
 onMounted(async () => {
   await Promise.all([
     cctvStore.fetchSitesAndZones(),
-    cctvStore.fetchCameras()
+    cctvStore.fetchCameras(),
+    audioStore.fetchAudioDevices()
   ])
 })
 </script>

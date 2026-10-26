@@ -110,9 +110,9 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Proses login ke backend dengan pemisahan portal ketat (ADMIN vs OPERATOR)
+   * Proses login ke backend (Universal Single-Form Login)
    */
-  async function login({ username, password, targetPortal = null }) {
+  async function login({ username, password }) {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: {
@@ -134,19 +134,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const authenticatedUser = body.data.user
-
-    // Validasi Pemisahan Portal: Pastikan role akun cocok dengan portal yang dipilih
-    if (targetPortal === 'ADMIN' && authenticatedUser.role !== 'ADMIN') {
-      // Segera bersihkan session di server karena tidak berhak masuk portal Admin
-      await logout()
-      throw new Error('Akses Ditolak: Akun Anda tidak memiliki izin akses Administrator pada portal ini.')
-    }
-
-    if (targetPortal === 'OPERATOR' && authenticatedUser.role !== 'OPERATOR') {
-      // Akun Admin mencoba login di portal Operator
-      await logout()
-      throw new Error('Akun Anda memiliki hak akses Administrator. Silakan gunakan tab Portal Administrator.')
-    }
 
     // Set state pengguna (Terkunci permanen, tidak bisa diganti di dashboard)
     user.value = authenticatedUser

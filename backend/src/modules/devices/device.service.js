@@ -10,6 +10,15 @@ import { NotFoundError, BadRequestError, ConflictError } from "../../utils/error
 function sanitizeDeviceOutput(device) {
   if (!device) return null;
   const { credentialCipher, ...rest } = device;
+
+  // Jika zona yang terikat telah dihapus (soft-deleted) atau tidak ada, kosongkan zone dan zoneId (Unassigned)
+  const isZoneDeleted =
+    !device.zoneId ||
+    (device.zone && device.zone.deletedAt !== null && device.zone.deletedAt !== undefined);
+
+  const cleanZone = isZoneDeleted ? null : device.zone;
+  const cleanZoneId = isZoneDeleted ? null : device.zoneId;
+
   const streamUrl =
     device.adapterConfig && typeof device.adapterConfig === "object" && device.adapterConfig.streamUrl
       ? device.adapterConfig.streamUrl
@@ -17,11 +26,41 @@ function sanitizeDeviceOutput(device) {
       ? device.streamKey
       : null;
 
+  const whipUrl =
+    device.adapterConfig && typeof device.adapterConfig === "object" && device.adapterConfig.whipUrl
+      ? device.adapterConfig.whipUrl
+      : device.host && device.host.startsWith("http")
+      ? device.host
+      : null;
+
+  const volume =
+    device.adapterConfig && typeof device.adapterConfig === "object" && typeof device.adapterConfig.volume === "number"
+      ? device.adapterConfig.volume
+      : 80;
+
   return {
     ...rest,
+    zoneId: cleanZoneId,
+    zone: cleanZone,
     streamUrl,
+    whipUrl,
+    volume,
     hasCredential: !!credentialCipher,
   };
+}
+
+function normalizeUrl(url) {
+  if (!url || typeof url !== "string") return "";
+  return url.trim().toLowerCase().replace(/\/+$/, "");
+}
+
+function isUrlMatch(urlA, urlB) {
+  const a = normalizeUrl(urlA);
+  const b = normalizeUrl(urlB);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.endsWith("/" + b) || b.endsWith("/" + a)) return true;
+  return false;
 }
 
 // -----------------------------------------------------------------------------
@@ -273,15 +312,15 @@ export async function deleteZone(id, userId, req) {
   const existing = await prisma.zone.findFirst({ where: { id, deletedAt: null } });
   if (!existing) throw new NotFoundError(`Zona dengan ID ${id} tidak ditemukan`);
 
-  // Opsi A: Jika zona memiliki perangkat aktif (CCTV atau Audio), lepaskan penugasan zona
-  // (zoneId = null) sehingga perangkat TIDAK ikut hilang dan tetap aktif dipantau di Site terkait.
+  // Lepaskan penugasan zona (zoneId = null) pada seluruh perangkat (CCTV dan Audio)
+  // sehingga perangkat otomatis unassigned dan TIDAK ikut hilang.
   const [detachedCameras, detachedAudio, updated] = await prisma.$transaction([
     prisma.camera.updateMany({
-      where: { zoneId: id, deletedAt: null },
+      where: { zoneId: id },
       data: { zoneId: null },
     }),
     prisma.audioDevice.updateMany({
-      where: { zoneId: id, deletedAt: null },
+      where: { zoneId: id },
       data: { zoneId: null },
     }),
     prisma.zone.update({
@@ -340,7 +379,7 @@ export async function listCameras(query = {}) {
       where,
       include: {
         site: { select: { id: true, name: true } },
-        zone: { select: { id: true, name: true } },
+        zone: { select: { id: true, name: true, deletedAt: true } },
       },
       orderBy: { id: "asc" },
       skip,
@@ -361,7 +400,7 @@ export async function getCameraById(id) {
     where: { id, deletedAt: null },
     include: {
       site: { select: { id: true, name: true } },
-      zone: { select: { id: true, name: true } },
+      zone: { select: { id: true, name: true, deletedAt: true } },
       statusHistory: {
         orderBy: { occurredAt: "desc" },
         take: 10,
@@ -387,14 +426,34 @@ export async function createCamera(data, userId, req) {
     throw new ConflictError(`Kamera bernama '${data.name}' sudah ada di site tersebut`);
   }
 
-  // Jika ada zoneId, pastikan zona tersebut berada di site yang sama
+  // Cek keunikan URL stream kamera jika diisi
+  if (data.streamUrl && data.streamUrl.trim()) {
+    const activeCams = await prisma.camera.findMany({ where: { deletedAt: null } });
+    const duplicateUrl = activeCams.find((c) => {
+      return (
+        isUrlMatch(data.streamUrl, c.adapterConfig?.streamUrl) ||
+        isUrlMatch(data.streamUrl, c.streamKey) ||
+        isUrlMatch(data.streamUrl, c.host)
+      );
+    });
+    if (duplicateUrl) {
+      throw new ConflictError(
+        `URL stream '${data.streamUrl}' sudah digunakan oleh kamera ${duplicateUrl.id} (${duplicateUrl.name})`
+      );
+    }
+  }
+
+  // Jika ada zoneId, validasi dan otomatis sinkronkan dengan site pemilik zona
   if (data.zoneId) {
     const zone = await prisma.zone.findFirst({
-      where: { id: data.zoneId, siteId: data.siteId, deletedAt: null },
+      where: { id: data.zoneId, deletedAt: null },
     });
     if (!zone) {
-      throw new BadRequestError(`Zona ${data.zoneId} tidak valid atau bukan milik site ${data.siteId}`);
+      throw new BadRequestError(`Zona ${data.zoneId} tidak valid atau telah dihapus`);
     }
+    data.siteId = zone.siteId;
+  } else if (data.zoneId === "" || data.zoneId === null) {
+    data.zoneId = null;
   }
 
   const { credential, streamUrl, ...cameraFields } = data;
@@ -427,7 +486,7 @@ export async function createCamera(data, userId, req) {
     },
     include: {
       site: { select: { id: true, name: true } },
-      zone: { select: { id: true, name: true } },
+      zone: { select: { id: true, name: true, deletedAt: true } },
     },
   });
 
@@ -449,7 +508,7 @@ export async function updateCamera(id, data, userId, req) {
   });
   if (!existing) throw new NotFoundError(`Kamera dengan ID ${id} tidak ditemukan`);
 
-  const siteId = data.siteId || existing.siteId;
+  let siteId = data.siteId || existing.siteId;
 
   if (data.name && data.name !== existing.name) {
     const duplicate = await prisma.camera.findFirst({
@@ -460,16 +519,38 @@ export async function updateCamera(id, data, userId, req) {
     }
   }
 
-  if (data.zoneId) {
-    const zone = await prisma.zone.findFirst({
-      where: { id: data.zoneId, siteId, deletedAt: null },
+  // Cek keunikan URL stream kamera jika diisi saat edit
+  if (data.streamUrl && data.streamUrl.trim()) {
+    const activeCams = await prisma.camera.findMany({ where: { deletedAt: null, id: { not: id } } });
+    const duplicateUrl = activeCams.find((c) => {
+      return (
+        isUrlMatch(data.streamUrl, c.adapterConfig?.streamUrl) ||
+        isUrlMatch(data.streamUrl, c.streamKey) ||
+        isUrlMatch(data.streamUrl, c.host)
+      );
     });
-    if (!zone) {
-      throw new BadRequestError(`Zona ${data.zoneId} tidak valid atau bukan milik site ${siteId}`);
+    if (duplicateUrl) {
+      throw new ConflictError(
+        `URL stream '${data.streamUrl}' sudah digunakan oleh kamera ${duplicateUrl.id} (${duplicateUrl.name})`
+      );
     }
   }
 
   const { credential, streamUrl, ...updateFields } = data;
+
+  if (data.zoneId) {
+    const zone = await prisma.zone.findFirst({
+      where: { id: data.zoneId, deletedAt: null },
+    });
+    if (!zone) {
+      throw new BadRequestError(`Zona ${data.zoneId} tidak valid atau telah dihapus`);
+    }
+    siteId = zone.siteId;
+    updateFields.siteId = zone.siteId;
+    updateFields.zoneId = zone.id;
+  } else if (data.zoneId === null || data.zoneId === "") {
+    updateFields.zoneId = null;
+  }
   if (credential) {
     updateFields.credentialCipher = encryptCredential(credential);
   }
@@ -499,7 +580,7 @@ export async function updateCamera(id, data, userId, req) {
     data: updateFields,
     include: {
       site: { select: { id: true, name: true } },
-      zone: { select: { id: true, name: true } },
+      zone: { select: { id: true, name: true, deletedAt: true } },
     },
   });
 
@@ -565,7 +646,7 @@ export async function listAudioDevices(query = {}) {
       where,
       include: {
         site: { select: { id: true, name: true } },
-        zone: { select: { id: true, name: true } },
+        zone: { select: { id: true, name: true, deletedAt: true } },
         channelLease: {
           select: { userId: true, acquiredAt: true, expiresAt: true },
         },
@@ -589,7 +670,7 @@ export async function getAudioDeviceById(id) {
     where: { id, deletedAt: null },
     include: {
       site: { select: { id: true, name: true } },
-      zone: { select: { id: true, name: true } },
+      zone: { select: { id: true, name: true, deletedAt: true } },
       channelLease: true,
       statusHistory: {
         orderBy: { occurredAt: "desc" },
@@ -615,26 +696,58 @@ export async function createAudioDevice(data, userId, req) {
     throw new ConflictError(`Perangkat audio bernama '${data.name}' sudah ada di site tersebut`);
   }
 
-  if (data.zoneId) {
-    const zone = await prisma.zone.findFirst({
-      where: { id: data.zoneId, siteId: data.siteId, deletedAt: null },
+  // Cek keunikan URL stream audio WHIP jika diisi
+  if (data.whipUrl && data.whipUrl.trim()) {
+    const activeAuds = await prisma.audioDevice.findMany({ where: { deletedAt: null } });
+    const duplicateUrl = activeAuds.find((a) => {
+      return (
+        isUrlMatch(data.whipUrl, a.adapterConfig?.whipUrl) ||
+        isUrlMatch(data.whipUrl, a.host)
+      );
     });
-    if (!zone) {
-      throw new BadRequestError(`Zona ${data.zoneId} tidak valid atau bukan milik site ${data.siteId}`);
+    if (duplicateUrl) {
+      throw new ConflictError(
+        `URL stream audio WHIP '${data.whipUrl}' sudah digunakan oleh speaker ${duplicateUrl.id} (${duplicateUrl.name})`
+      );
     }
   }
 
-  const { credential, ...deviceFields } = data;
+  // Jika ada zoneId, validasi dan sinkronkan dengan site pemilik zona
+  if (data.zoneId) {
+    const zone = await prisma.zone.findFirst({
+      where: { id: data.zoneId, deletedAt: null },
+    });
+    if (!zone) {
+      throw new BadRequestError(`Zona ${data.zoneId} tidak valid atau telah dihapus`);
+    }
+    data.siteId = zone.siteId;
+  } else if (data.zoneId === "" || data.zoneId === null) {
+    data.zoneId = null;
+  }
+
+  const { credential, whipUrl, volume, ...deviceFields } = data;
   const credentialCipher = credential ? encryptCredential(credential) : undefined;
+
+  const currentConfig =
+    deviceFields.adapterConfig && typeof deviceFields.adapterConfig === "object"
+      ? deviceFields.adapterConfig
+      : {};
+
+  const adapterConfig = {
+    ...currentConfig,
+    ...(whipUrl ? { whipUrl } : {}),
+    ...(volume !== undefined ? { volume } : {}),
+  };
 
   const created = await prisma.audioDevice.create({
     data: {
       ...deviceFields,
+      adapterConfig,
       credentialCipher,
     },
     include: {
       site: { select: { id: true, name: true } },
-      zone: { select: { id: true, name: true } },
+      zone: { select: { id: true, name: true, deletedAt: true } },
     },
   });
 
@@ -654,7 +767,7 @@ export async function updateAudioDevice(id, data, userId, req) {
   const existing = await prisma.audioDevice.findFirst({ where: { id, deletedAt: null } });
   if (!existing) throw new NotFoundError(`Perangkat audio dengan ID ${id} tidak ditemukan`);
 
-  const siteId = data.siteId || existing.siteId;
+  let siteId = data.siteId || existing.siteId;
 
   if (data.name && data.name !== existing.name) {
     const duplicate = await prisma.audioDevice.findFirst({
@@ -665,18 +778,51 @@ export async function updateAudioDevice(id, data, userId, req) {
     }
   }
 
-  if (data.zoneId) {
-    const zone = await prisma.zone.findFirst({
-      where: { id: data.zoneId, siteId, deletedAt: null },
+  // Cek keunikan URL stream audio WHIP jika diisi saat edit
+  if (data.whipUrl && data.whipUrl.trim()) {
+    const activeAuds = await prisma.audioDevice.findMany({ where: { deletedAt: null, id: { not: id } } });
+    const duplicateUrl = activeAuds.find((a) => {
+      return (
+        isUrlMatch(data.whipUrl, a.adapterConfig?.whipUrl) ||
+        isUrlMatch(data.whipUrl, a.host)
+      );
     });
-    if (!zone) {
-      throw new BadRequestError(`Zona ${data.zoneId} tidak valid atau bukan milik site ${siteId}`);
+    if (duplicateUrl) {
+      throw new ConflictError(
+        `URL stream audio WHIP '${data.whipUrl}' sudah digunakan oleh speaker ${duplicateUrl.id} (${duplicateUrl.name})`
+      );
     }
   }
 
-  const { credential, ...updateFields } = data;
+  const { credential, whipUrl, volume, ...updateFields } = data;
+
+  if (data.zoneId) {
+    const zone = await prisma.zone.findFirst({
+      where: { id: data.zoneId, deletedAt: null },
+    });
+    if (!zone) {
+      throw new BadRequestError(`Zona ${data.zoneId} tidak valid atau telah dihapus`);
+    }
+    siteId = zone.siteId;
+    updateFields.siteId = zone.siteId;
+    updateFields.zoneId = zone.id;
+  } else if (data.zoneId === null || data.zoneId === "") {
+    updateFields.zoneId = null;
+  }
   if (credential) {
     updateFields.credentialCipher = encryptCredential(credential);
+  }
+
+  if (whipUrl !== undefined || volume !== undefined) {
+    const currentConfig =
+      existing.adapterConfig && typeof existing.adapterConfig === "object"
+        ? existing.adapterConfig
+        : {};
+    updateFields.adapterConfig = {
+      ...currentConfig,
+      ...(whipUrl !== undefined ? { whipUrl: whipUrl || null } : {}),
+      ...(volume !== undefined ? { volume } : {}),
+    };
   }
 
   const updated = await prisma.audioDevice.update({
@@ -684,7 +830,7 @@ export async function updateAudioDevice(id, data, userId, req) {
     data: updateFields,
     include: {
       site: { select: { id: true, name: true } },
-      zone: { select: { id: true, name: true } },
+      zone: { select: { id: true, name: true, deletedAt: true } },
     },
   });
 
@@ -707,7 +853,7 @@ export async function deleteAudioDevice(id, userId, req) {
 
   const updated = await prisma.audioDevice.update({
     where: { id },
-    data: { deletedAt: new Date() },
+    data: { deletedAt: new Date(), isActive: false },
   });
 
   await recordAuditLog({

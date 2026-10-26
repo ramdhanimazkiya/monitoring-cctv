@@ -36,7 +36,7 @@ router.get("/health", async (req, res) => {
     },
   };
 
-  res.status(isHealthy ? 200 : 200).json(payload);
+  res.status(isHealthy ? 200 : 503).json(payload);
 });
 
 /**

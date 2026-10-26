@@ -37,7 +37,7 @@
           @click="handleExport('csv')"
         >
           <Download class="w-3.5 h-3.5 mr-1.5 text-blue-400" />
-          Ekspor CSV (Rekap & Log)
+          Ekspor CSV 
         </Button>
       </div>
     </div>
@@ -69,26 +69,31 @@
           </div>
         </div>
 
-        <!-- Rekapitulasi Audio PTT: Total PTT & Sesi -->
+        <!-- Rekapitulasi Audio: Rata-rata Status Koneksi & Total PTT -->
         <div class="flex items-center justify-between pt-3 md:pt-0 pl-0 md:pl-6">
           <div class="flex items-center gap-2.5">
             <div class="w-8 h-8 rounded-lg bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shrink-0">
               <Megaphone class="w-4 h-4" />
             </div>
             <div>
-              <span class="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Rekap Audio PTT</span>
-              <span class="text-[11px] text-slate-300">Aktivitas Siaran Suara</span>
+              <span class="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">Rekap Audio</span>
+              <span class="text-[11px] text-slate-300">Rata-rata Status Koneksi</span>
             </div>
           </div>
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-3 sm:gap-4 flex-wrap justify-end">
             <div class="text-right">
-              <span class="text-[10px] text-slate-400 block">Total PTT:</span>
-              <span class="text-base font-bold text-indigo-300">{{ audioRecap.totalPtt }}</span>
+              <span class="text-[10px] text-slate-400 block">Rata-rata Online:</span>
+              <span class="text-base font-bold text-emerald-400">{{ audioRecap.onlinePercent ?? 0 }}%</span>
             </div>
             <div class="h-7 w-px bg-[#1e2a3b]"></div>
             <div class="text-right">
-              <span class="text-[10px] text-slate-400 block">Total Sesi:</span>
-              <span class="text-base font-bold text-purple-400">{{ audioRecap.totalSessions }} Sesi</span>
+              <span class="text-[10px] text-slate-400 block">Rata-rata Offline:</span>
+              <span class="text-base font-bold text-rose-400">{{ audioRecap.offlinePercent ?? 0 }}%</span>
+            </div>
+            <div class="h-7 w-px bg-[#1e2a3b] hidden sm:block"></div>
+            <div class="text-right hidden sm:block">
+              <span class="text-[10px] text-slate-400 block">Total PTT:</span>
+              <span class="text-base font-bold text-indigo-300">{{ audioRecap.totalPtt }}</span>
             </div>
           </div>
         </div>
@@ -698,7 +703,7 @@ function formatJson(val) {
 const cctvRecap = computed(() => {
   return (
     eventsStore.stats.recap?.cctv || {
-      onlinePercent: 100,
+      onlinePercent: 0,
       offlinePercent: 0
     }
   )
@@ -707,6 +712,8 @@ const cctvRecap = computed(() => {
 const audioRecap = computed(() => {
   return (
     eventsStore.stats.recap?.audio || {
+      onlinePercent: 0,
+      offlinePercent: 0,
       totalPtt: 0,
       totalSessions: 0
     }

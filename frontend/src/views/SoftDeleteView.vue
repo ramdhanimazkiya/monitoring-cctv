@@ -31,21 +31,74 @@
     <!-- ===================================================================== -->
     <!-- 1. DEVICE MANAGEMENT (CCTV & AUDIO)                                   -->
     <!-- ===================================================================== -->
-    <div v-if="currentSub === 'devices'" class="space-y-4">
-      <!-- Search Input Full Width -->
-      <div class="w-full relative">
-        <Search class="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-        <input
-          v-model="deviceSearchQuery"
-          type="text"
-          placeholder="Cari ID perangkat, nama perangkat, atau lokasi site/zona..."
-          class="w-full bg-[#111827] border border-[#283548] rounded-lg pl-9 pr-4 py-2 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-        />
+    <div v-if="currentSub === 'devices'" class="space-y-6">
+      <!-- Search Input & Filter Tabs -->
+      <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        <div class="relative flex-1">
+          <Search class="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            v-model="deviceSearchQuery"
+            type="text"
+            placeholder="Cari ID perangkat, nama perangkat, URL stream/WHIP, atau lokasi site/zona..."
+            class="w-full bg-[#111827] border border-[#283548] rounded-lg pl-9 pr-4 py-2 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          />
+        </div>
+
+        <!-- Filter Tab Pills -->
+        <div class="flex items-center gap-1.5 p-1 bg-[#111827] border border-[#283548] rounded-lg font-mono text-xs">
+          <button
+            type="button"
+            :class="[
+              'px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1.5',
+              deviceTab === 'all'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            ]"
+            @click="deviceTab = 'all'"
+          >
+            Semua
+            <span class="px-1.5 py-0.2 rounded text-[10px] bg-[#1e2a3b] text-slate-300">
+              {{ allDeletedDevicesCount }}
+            </span>
+          </button>
+          <button
+            type="button"
+            :class="[
+              'px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1.5',
+              deviceTab === 'cctv'
+                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            ]"
+            @click="deviceTab = 'cctv'"
+          >
+            <Video class="w-3.5 h-3.5" />
+            Kamera CCTV
+            <span class="px-1.5 py-0.2 rounded text-[10px] bg-blue-950/80 text-blue-300 border border-blue-800">
+              {{ trashStore.deletedDevices.cameras?.length || 0 }}
+            </span>
+          </button>
+          <button
+            type="button"
+            :class="[
+              'px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer flex items-center gap-1.5',
+              deviceTab === 'audio'
+                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            ]"
+            @click="deviceTab = 'audio'"
+          >
+            <Megaphone class="w-3.5 h-3.5" />
+            Speaker Audio
+            <span class="px-1.5 py-0.2 rounded text-[10px] bg-purple-950/80 text-purple-300 border border-purple-800">
+              {{ trashStore.deletedDevices.audioDevices?.length || 0 }}
+            </span>
+          </button>
+        </div>
       </div>
 
-      <!-- Empty State -->
+      <!-- Empty State when nothing in both -->
       <div
-        v-if="!trashStore.loading && filteredDevicesList.length === 0"
+        v-if="!trashStore.loading && allDeletedDevicesCount === 0"
         class="p-12 text-center bg-[#0d131f]/60 border border-[#1e2a3b] rounded-xl font-mono text-xs text-slate-400"
       >
         <Server class="w-8 h-8 text-slate-600 mx-auto mb-2" />
@@ -53,91 +106,245 @@
         <p class="text-slate-500 mt-0.5">Seluruh kamera CCTV dan speaker audio aktif pada sistem.</p>
       </div>
 
-      <!-- Data Table -->
-      <div v-else class="overflow-x-auto rounded-xl border border-[#283548] bg-[#0d131f]">
-        <table class="w-full text-left text-xs">
-          <thead class="bg-[#131b2c] border-b border-[#283548] text-slate-400 font-mono text-[11px] uppercase tracking-wider">
-            <tr>
-              <th class="px-4 py-3 w-32">ID Perangkat</th>
-              <th class="px-4 py-3">Nama Perangkat</th>
-              <th class="px-4 py-3 w-28">Tipe</th>
-              <th class="px-4 py-3">Lokasi Terakhir</th>
-              <th class="px-4 py-3 w-44">Waktu Dihapus</th>
-              <th class="px-4 py-3 text-right w-36">Aksi</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-[#1e2a3b] font-mono">
-            <tr
-              v-for="item in paginatedDevices"
-              :key="item.id"
-              class="hover:bg-[#151f33]/60 transition-colors"
+      <!-- 1. KAMERA CCTV TABLE -->
+      <div v-if="(deviceTab === 'all' || deviceTab === 'cctv') && (allDeletedDevicesCount > 0 || deviceSearchQuery)" class="space-y-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <Video class="w-4 h-4 text-blue-400" />
+            <h3 class="text-xs font-bold text-slate-200 font-mono uppercase tracking-wider">
+              Kamera CCTV Terhapus ({{ filteredCamerasList.length }})
+            </h3>
+          </div>
+          <span class="text-[11px] font-mono text-slate-400">
+            Inventaris video stream diarsipkan
+          </span>
+        </div>
+
+        <div
+          v-if="!trashStore.loading && filteredCamerasList.length === 0"
+          class="p-6 text-center bg-[#0d131f]/40 border border-[#1e2a3b] rounded-xl text-xs text-slate-500 font-mono"
+        >
+          Tidak ada kamera CCTV terhapus{{ deviceSearchQuery ? ' yang cocok dengan pencarian' : '' }}.
+        </div>
+
+        <div v-else class="overflow-x-auto rounded-xl border border-[#283548] bg-[#0d131f]">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-[#131b2c] border-b border-[#283548] text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+              <tr>
+                <th class="px-4 py-3 w-32">ID Kamera</th>
+                <th class="px-4 py-3">Nama Kamera</th>
+                <th class="px-4 py-3">URL Stream Video</th>
+                <th class="px-4 py-3">Lokasi Terakhir</th>
+                <th class="px-4 py-3 w-44">Waktu Dihapus</th>
+                <th class="px-4 py-3 text-right w-36">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[#1e2a3b] font-mono">
+              <tr
+                v-for="cam in paginatedCameras"
+                :key="cam.id"
+                class="hover:bg-[#151f33]/60 transition-colors"
+              >
+                <td class="px-4 py-3 font-bold text-blue-400">
+                  {{ cam.id }}
+                </td>
+                <td class="px-4 py-3 font-semibold text-slate-200">
+                  {{ cam.name }}
+                </td>
+                <td class="px-4 py-3 text-slate-400 text-[11px]">
+                  <span class="truncate block max-w-xs text-blue-300 font-mono" :title="cam.streamUrl || '-'">
+                    {{ cam.streamUrl || 'Tanpa endpoint langsung' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-[11px] text-slate-300">
+                  <div>Site: <span class="font-bold text-slate-200">{{ cam.site?.name || cam.siteId || '-' }}</span></div>
+                  <div class="text-slate-500 text-[10px]">
+                    Zona: {{ cam.zone?.name || cam.zoneId || 'Tanpa Zona (Unassigned)' }}
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-slate-400 text-[11px]">
+                  {{ formatDateTime(cam.deletedAt) }}
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <Button
+                    variant="primary"
+                    size="xs"
+                    class="font-mono"
+                    @click="promptRestoreDevice(cam)"
+                  >
+                    <RotateCcw class="w-3 h-3 mr-1" />
+                    Pulihkan Kamera
+                  </Button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- CCTV Pagination -->
+        <div v-if="filteredCamerasList.length > 0" class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-400 pt-1">
+          <div class="flex items-center gap-2">
+            <span>Baris per halaman:</span>
+            <select
+              v-model="cctvPageSize"
+              class="bg-[#151f33] border border-[#283548] text-slate-200 rounded px-2 py-0.5 cursor-pointer focus:outline-none"
+              @change="cctvCurrentPage = 1"
             >
-              <td class="px-4 py-3 font-bold text-amber-400">
-                {{ item.id }}
-              </td>
-              <td class="px-4 py-3">
-                <div class="font-semibold text-slate-200">{{ item.name }}</div>
-                <div class="text-[10px] text-slate-500 truncate max-w-sm">
-                  {{ item.streamUrl || item.whipUrl || item.host || 'Tanpa endpoint langsung' }}
-                </div>
-              </td>
-              <td class="px-4 py-3">
-                <span
-                  :class="[
-                    'px-2 py-0.5 rounded text-[10px] font-bold border',
-                    item.deviceType === 'CCTV'
-                      ? 'bg-blue-950/80 text-blue-300 border-blue-800'
-                      : 'bg-purple-950/80 text-purple-300 border-purple-800'
-                  ]"
-                >
-                  {{ item.deviceType }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-[11px] text-slate-300">
-                <div>Site: <span class="font-bold text-slate-200">{{ item.site?.name || item.siteId || '-' }}</span></div>
-                <div class="text-slate-500 text-[10px]">
-                  Zona: {{ item.zone?.name || item.zoneId || 'Tanpa Zona (Unassigned)' }}
-                </div>
-              </td>
-              <td class="px-4 py-3 text-slate-400 text-[11px]">
-                {{ formatDateTime(item.deletedAt) }}
-              </td>
-              <td class="px-4 py-3 text-right">
-                <Button
-                  variant="primary"
-                  size="xs"
-                  class="font-mono"
-                  @click="promptRestoreDevice(item)"
-                >
-                  <RotateCcw class="w-3 h-3 mr-1" />
-                  Pulihkan
-                </Button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              :disabled="cctvCurrentPage <= 1"
+              class="px-2.5 py-1 rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              @click="cctvCurrentPage--"
+            >
+              &larr; Sebelumnya
+            </button>
+
+            <span class="px-2.5 py-1 text-slate-300 bg-[#0d131f] border border-[#283548] rounded font-bold">
+              {{ cctvCurrentPage }} / {{ cctvTotalPages }}
+            </span>
+
+            <button
+              type="button"
+              :disabled="cctvCurrentPage >= cctvTotalPages"
+              class="px-2.5 py-1 rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              @click="cctvCurrentPage++"
+            >
+              Selanjutnya &rarr;
+            </button>
+          </div>
+        </div>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="deviceTotalPages > 1" class="flex items-center justify-between text-xs font-mono text-slate-400">
-        <span>Halaman {{ deviceCurrentPage }} dari {{ deviceTotalPages }}</span>
-        <div class="flex gap-1">
-          <Button
-            variant="secondary"
-            size="xs"
-            :disabled="deviceCurrentPage <= 1"
-            @click="deviceCurrentPage--"
-          >
-            Prev
-          </Button>
-          <Button
-            variant="secondary"
-            size="xs"
-            :disabled="deviceCurrentPage >= deviceTotalPages"
-            @click="deviceCurrentPage++"
-          >
-            Next
-          </Button>
+      <!-- 2. SPEAKER AUDIO TABLE -->
+      <div v-if="(deviceTab === 'all' || deviceTab === 'audio') && (allDeletedDevicesCount > 0 || deviceSearchQuery)" class="space-y-2 pt-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <Megaphone class="w-4 h-4 text-purple-400" />
+            <h3 class="text-xs font-bold text-slate-200 font-mono uppercase tracking-wider">
+              Speaker Audio Terhapus ({{ filteredAudioList.length }})
+            </h3>
+          </div>
+          <span class="text-[11px] font-mono text-slate-400">
+            Perangkat speaker WHIP diarsipkan
+          </span>
+        </div>
+
+        <div
+          v-if="!trashStore.loading && filteredAudioList.length === 0"
+          class="p-6 text-center bg-[#0d131f]/40 border border-[#1e2a3b] rounded-xl text-xs text-slate-500 font-mono"
+        >
+          Tidak ada speaker audio terhapus{{ deviceSearchQuery ? ' yang cocok dengan pencarian' : '' }}.
+        </div>
+
+        <div v-else class="overflow-x-auto rounded-xl border border-[#283548] bg-[#0d131f]">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-[#131b2c] border-b border-[#283548] text-slate-400 font-mono text-[11px] uppercase tracking-wider">
+              <tr>
+                <th class="px-4 py-3 w-32">ID Speaker</th>
+                <th class="px-4 py-3">Nama Speaker</th>
+                <th class="px-4 py-3">WHIP Ingestion URL</th>
+                <th class="px-4 py-3 w-28">Format</th>
+                <th class="px-4 py-3">Lokasi Terakhir</th>
+                <th class="px-4 py-3 w-44">Waktu Dihapus</th>
+                <th class="px-4 py-3 text-right w-36">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[#1e2a3b] font-mono">
+              <tr
+                v-for="aud in paginatedAudio"
+                :key="aud.id"
+                class="hover:bg-[#151f33]/60 transition-colors"
+              >
+                <td class="px-4 py-3 font-bold text-purple-400">
+                  {{ aud.id }}
+                </td>
+                <td class="px-4 py-3 font-semibold text-slate-200">
+                  {{ aud.name }}
+                </td>
+                <td class="px-4 py-3 text-slate-400 text-[11px]">
+                  <span class="truncate block max-w-xs text-purple-300 font-mono" :title="aud.whipUrl || aud.host || '-'">
+                    {{ aud.whipUrl || aud.host || 'Tanpa WHIP endpoint' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-700/60">
+                    16kHz Mono
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-[11px] text-slate-300">
+                  <div>Site: <span class="font-bold text-slate-200">{{ aud.site?.name || aud.siteId || '-' }}</span></div>
+                  <div class="text-slate-500 text-[10px]">
+                    Zona: {{ aud.zone?.name || aud.zoneId || 'Tanpa Zona (Unassigned)' }}
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-slate-400 text-[11px]">
+                  {{ formatDateTime(aud.deletedAt) }}
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <Button
+                    variant="primary"
+                    size="xs"
+                    class="font-mono"
+                    @click="promptRestoreDevice(aud)"
+                  >
+                    <RotateCcw class="w-3 h-3 mr-1" />
+                    Pulihkan Speaker
+                  </Button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Audio Pagination -->
+        <div v-if="filteredAudioList.length > 0" class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-400 pt-1">
+          <div class="flex items-center gap-2">
+            <span>Baris per halaman:</span>
+            <select
+              v-model="audioPageSize"
+              class="bg-[#151f33] border border-[#283548] text-slate-200 rounded px-2 py-0.5 cursor-pointer focus:outline-none"
+              @change="audioCurrentPage = 1"
+            >
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              :disabled="audioCurrentPage <= 1"
+              class="px-2.5 py-1 rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              @click="audioCurrentPage--"
+            >
+              &larr; Sebelumnya
+            </button>
+
+            <span class="px-2.5 py-1 text-slate-300 bg-[#0d131f] border border-[#283548] rounded font-bold">
+              {{ audioCurrentPage }} / {{ audioTotalPages }}
+            </span>
+
+            <button
+              type="button"
+              :disabled="audioCurrentPage >= audioTotalPages"
+              class="px-2.5 py-1 rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              @click="audioCurrentPage++"
+            >
+              Selanjutnya &rarr;
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -186,11 +393,11 @@
             </thead>
             <tbody class="divide-y divide-[#1e2a3b] font-mono">
               <tr
-                v-for="site in filteredSitesList"
+                v-for="site in paginatedSites"
                 :key="site.id"
                 class="hover:bg-[#151f33]/60 transition-colors"
               >
-                <td class="px-4 py-3 font-bold text-emerald-400">{{ site.id }}</td>
+                <td class="px-4 py-3 font-bold text-blue-400">{{ site.id }}</td>
                 <td class="px-4 py-3 font-semibold text-slate-100">{{ site.name }}</td>
                 <td class="px-4 py-3 text-slate-400">{{ site.address || site.description || '-' }}</td>
                 <td class="px-4 py-3 text-slate-400">{{ formatDateTime(site.deletedAt) }}</td>
@@ -203,6 +410,48 @@
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Site Pagination -->
+        <div v-if="filteredSitesList.length > 0" class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-400 pt-1">
+          <div class="flex items-center gap-2">
+            <span>Baris per halaman:</span>
+            <select
+              v-model="sitePageSize"
+              class="bg-[#151f33] border border-[#283548] text-slate-200 rounded px-2 py-0.5 cursor-pointer focus:outline-none"
+              @change="siteCurrentPage = 1"
+            >
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              :disabled="siteCurrentPage <= 1"
+              class="px-2.5 py-1 rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              @click="siteCurrentPage--"
+            >
+              &larr; Sebelumnya
+            </button>
+
+            <span class="px-2.5 py-1 text-slate-300 bg-[#0d131f] border border-[#283548] rounded font-bold">
+              {{ siteCurrentPage }} / {{ siteTotalPages }}
+            </span>
+
+            <button
+              type="button"
+              :disabled="siteCurrentPage >= siteTotalPages"
+              class="px-2.5 py-1 rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              @click="siteCurrentPage++"
+            >
+              Selanjutnya &rarr;
+            </button>
+          </div>
         </div>
       </div>
 
@@ -235,11 +484,11 @@
             </thead>
             <tbody class="divide-y divide-[#1e2a3b] font-mono">
               <tr
-                v-for="zone in filteredZonesList"
+                v-for="zone in paginatedZones"
                 :key="zone.id"
                 class="hover:bg-[#151f33]/60 transition-colors"
               >
-                <td class="px-4 py-3 font-bold text-emerald-400">{{ zone.id }}</td>
+                <td class="px-4 py-3 font-bold text-purple-400">{{ zone.id }}</td>
                 <td class="px-4 py-3 font-semibold text-slate-100">{{ zone.name }}</td>
                 <td class="px-4 py-3">
                   <div class="flex items-center gap-1.5">
@@ -263,6 +512,48 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Zone Pagination -->
+        <div v-if="filteredZonesList.length > 0" class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-400 pt-1">
+          <div class="flex items-center gap-2">
+            <span>Baris per halaman:</span>
+            <select
+              v-model="zonePageSize"
+              class="bg-[#151f33] border border-[#283548] text-slate-200 rounded px-2 py-0.5 cursor-pointer focus:outline-none"
+              @change="zoneCurrentPage = 1"
+            >
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              :disabled="zoneCurrentPage <= 1"
+              class="px-2.5 py-1 rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              @click="zoneCurrentPage--"
+            >
+              &larr; Sebelumnya
+            </button>
+
+            <span class="px-2.5 py-1 text-slate-300 bg-[#0d131f] border border-[#283548] rounded font-bold">
+              {{ zoneCurrentPage }} / {{ zoneTotalPages }}
+            </span>
+
+            <button
+              type="button"
+              :disabled="zoneCurrentPage >= zoneTotalPages"
+              class="px-2.5 py-1 rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              @click="zoneCurrentPage++"
+            >
+              Selanjutnya &rarr;
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -284,8 +575,7 @@
       <!-- Empty State -->
       <div
         v-if="!trashStore.loading && filteredUsersList.length === 0"
-        class="p-12 text-center bg-[#0d131f]/60 border border-[#1e2a3b] rounded-xl font-mono text-xs text-slate-400"
-      >
+        class="p-12 text-center bg-[#0d131f]/60 border border-[#1e2a3b] rounded-xl font-mono text-xs text-slate-400">
         <Users class="w-8 h-8 text-slate-600 mx-auto mb-2" />
         <p class="text-slate-300 font-semibold">Tidak ada akun pengguna di tempat sampah</p>
         <p class="text-slate-500 mt-0.5">Semua akun administrator dan operator aktif.</p>
@@ -310,7 +600,7 @@
               :key="u.id"
               class="hover:bg-[#151f33]/60 transition-colors"
             >
-              <td class="px-4 py-3 font-bold text-amber-400">{{ u.id }}</td>
+              <td class="px-4 py-3 font-bold text-purple-400">{{ u.id }}</td>
               <td class="px-4 py-3">
                 <div class="font-bold text-slate-200">@{{ u.username }}</div>
                 <div class="text-[10px] text-slate-500">{{ u.email || 'Tanpa email' }}</div>
@@ -340,26 +630,45 @@
         </table>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="userTotalPages > 1" class="flex items-center justify-between text-xs font-mono text-slate-400">
-        <span>Halaman {{ userCurrentPage }} dari {{ userTotalPages }}</span>
-        <div class="flex gap-1">
-          <Button
-            variant="secondary"
-            size="xs"
+      <!-- User Pagination -->
+      <div v-if="filteredUsersList.length > 0" class="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-slate-400 pt-1">
+        <div class="flex items-center gap-2">
+          <span>Baris per halaman:</span>
+          <select
+            v-model="userPageSize"
+            class="bg-[#151f33] border border-[#283548] text-slate-200 rounded px-2 py-0.5 cursor-pointer focus:outline-none"
+            @change="userCurrentPage = 1"
+          >
+            <option :value="5">5</option>
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <button
+            type="button"
             :disabled="userCurrentPage <= 1"
+            class="px-2.5 py-1 rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
             @click="userCurrentPage--"
           >
-            Prev
-          </Button>
-          <Button
-            variant="secondary"
-            size="xs"
+            &larr; Sebelumnya
+          </button>
+
+          <span class="px-2.5 py-1 text-slate-300 bg-[#0d131f] border border-[#283548] rounded font-bold">
+            {{ userCurrentPage }} / {{ userTotalPages }}
+          </span>
+
+          <button
+            type="button"
             :disabled="userCurrentPage >= userTotalPages"
+            class="px-2.5 py-1 rounded bg-[#151f33] border border-[#283548] text-slate-300 hover:text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
             @click="userCurrentPage++"
           >
-            Next
-          </Button>
+            Selanjutnya &rarr;
+          </button>
         </div>
       </div>
     </div>
@@ -393,7 +702,9 @@ import {
   RefreshCw,
   Building2,
   Layers,
-  Search
+  Search,
+  Video,
+  Megaphone
 } from '@lucide/vue'
 
 const route = useRoute()
@@ -452,42 +763,93 @@ async function refreshData() {
 }
 
 // -----------------------------------------------------------------------------
-// 1. DEVICE MANAGEMENT FILTER (SEARCH ONLY, NO TYPE FILTER BUTTONS)
+// 1. DEVICE MANAGEMENT FILTER & PAGINATION (CCTV & AUDIO)
 // -----------------------------------------------------------------------------
+const deviceTab = ref('all') // 'all' | 'cctv' | 'audio'
 const deviceSearchQuery = ref('')
-const deviceCurrentPage = ref(1)
-const devicePageSize = 10
 
-const allDeletedDevicesList = computed(() => {
+const cctvPageSize = ref(5)
+const cctvCurrentPage = ref(1)
+
+const audioPageSize = ref(5)
+const audioCurrentPage = ref(1)
+
+const allDeletedDevicesCount = computed(() => {
   const cams = trashStore.deletedDevices.cameras || []
   const auds = trashStore.deletedDevices.audioDevices || []
-  return [...cams, ...auds]
+  return cams.length + auds.length
 })
 
-const filteredDevicesList = computed(() => {
-  let list = allDeletedDevicesList.value
+const filteredCamerasList = computed(() => {
+  let list = trashStore.deletedDevices.cameras || []
   if (deviceSearchQuery.value.trim()) {
     const q = deviceSearchQuery.value.toLowerCase().trim()
-    list = list.filter((d) =>
-      (d.id && d.id.toLowerCase().includes(q)) ||
-      (d.name && d.name.toLowerCase().includes(q)) ||
-      (d.site?.name && d.site.name.toLowerCase().includes(q)) ||
-      (d.deviceType && d.deviceType.toLowerCase().includes(q))
+    list = list.filter((c) =>
+      (c.id && c.id.toLowerCase().includes(q)) ||
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.site?.name && c.site.name.toLowerCase().includes(q)) ||
+      (c.zone?.name && c.zone.name.toLowerCase().includes(q)) ||
+      (c.streamUrl && c.streamUrl.toLowerCase().includes(q))
     )
   }
   return list
 })
 
-const deviceTotalPages = computed(() => Math.ceil(filteredDevicesList.value.length / devicePageSize) || 1)
-const paginatedDevices = computed(() => {
-  const start = (deviceCurrentPage.value - 1) * devicePageSize
-  return filteredDevicesList.value.slice(start, start + devicePageSize)
+const filteredAudioList = computed(() => {
+  let list = trashStore.deletedDevices.audioDevices || []
+  if (deviceSearchQuery.value.trim()) {
+    const q = deviceSearchQuery.value.toLowerCase().trim()
+    list = list.filter((a) =>
+      (a.id && a.id.toLowerCase().includes(q)) ||
+      (a.name && a.name.toLowerCase().includes(q)) ||
+      (a.site?.name && a.site.name.toLowerCase().includes(q)) ||
+      (a.zone?.name && a.zone.name.toLowerCase().includes(q)) ||
+      (a.whipUrl && a.whipUrl.toLowerCase().includes(q)) ||
+      (a.host && a.host.toLowerCase().includes(q))
+    )
+  }
+  return list
+})
+
+const cctvTotalPages = computed(() => Math.ceil(filteredCamerasList.value.length / cctvPageSize.value) || 1)
+const paginatedCameras = computed(() => {
+  const start = (cctvCurrentPage.value - 1) * cctvPageSize.value
+  return filteredCamerasList.value.slice(start, start + cctvPageSize.value)
+})
+
+watch(cctvTotalPages, (newTotal) => {
+  if (cctvCurrentPage.value > newTotal) {
+    cctvCurrentPage.value = Math.max(1, newTotal)
+  }
+})
+
+const audioTotalPages = computed(() => Math.ceil(filteredAudioList.value.length / audioPageSize.value) || 1)
+const paginatedAudio = computed(() => {
+  const start = (audioCurrentPage.value - 1) * audioPageSize.value
+  return filteredAudioList.value.slice(start, start + audioPageSize.value)
+})
+
+watch(audioTotalPages, (newTotal) => {
+  if (audioCurrentPage.value > newTotal) {
+    audioCurrentPage.value = Math.max(1, newTotal)
+  }
+})
+
+watch([deviceSearchQuery, deviceTab], () => {
+  cctvCurrentPage.value = 1
+  audioCurrentPage.value = 1
 })
 
 // -----------------------------------------------------------------------------
-// 2. SITE & ZONE SEARCH
+// 2. SITE & ZONE SEARCH & PAGINATION
 // -----------------------------------------------------------------------------
 const siteZoneSearchQuery = ref('')
+
+const sitePageSize = ref(5)
+const siteCurrentPage = ref(1)
+
+const zonePageSize = ref(5)
+const zoneCurrentPage = ref(1)
 
 const filteredSitesList = computed(() => {
   let list = trashStore.deletedSitesAndZones.sites || []
@@ -500,6 +862,18 @@ const filteredSitesList = computed(() => {
     )
   }
   return list
+})
+
+const siteTotalPages = computed(() => Math.ceil(filteredSitesList.value.length / sitePageSize.value) || 1)
+const paginatedSites = computed(() => {
+  const start = (siteCurrentPage.value - 1) * sitePageSize.value
+  return filteredSitesList.value.slice(start, start + sitePageSize.value)
+})
+
+watch(siteTotalPages, (newTotal) => {
+  if (siteCurrentPage.value > newTotal) {
+    siteCurrentPage.value = Math.max(1, newTotal)
+  }
 })
 
 const filteredZonesList = computed(() => {
@@ -515,12 +889,29 @@ const filteredZonesList = computed(() => {
   return list
 })
 
+const zoneTotalPages = computed(() => Math.ceil(filteredZonesList.value.length / zonePageSize.value) || 1)
+const paginatedZones = computed(() => {
+  const start = (zoneCurrentPage.value - 1) * zonePageSize.value
+  return filteredZonesList.value.slice(start, start + zonePageSize.value)
+})
+
+watch(zoneTotalPages, (newTotal) => {
+  if (zoneCurrentPage.value > newTotal) {
+    zoneCurrentPage.value = Math.max(1, newTotal)
+  }
+})
+
+watch(siteZoneSearchQuery, () => {
+  siteCurrentPage.value = 1
+  zoneCurrentPage.value = 1
+})
+
 // -----------------------------------------------------------------------------
 // 3. USER MANAGEMENT SEARCH & PAGINATION
 // -----------------------------------------------------------------------------
 const userSearchQuery = ref('')
+const userPageSize = ref(5)
 const userCurrentPage = ref(1)
-const userPageSize = 10
 
 const filteredUsersList = computed(() => {
   let list = trashStore.deletedUsers || []
@@ -536,10 +927,20 @@ const filteredUsersList = computed(() => {
   return list
 })
 
-const userTotalPages = computed(() => Math.ceil(filteredUsersList.value.length / userPageSize) || 1)
+const userTotalPages = computed(() => Math.ceil(filteredUsersList.value.length / userPageSize.value) || 1)
 const paginatedUsers = computed(() => {
-  const start = (userCurrentPage.value - 1) * userPageSize
-  return filteredUsersList.value.slice(start, start + userPageSize)
+  const start = (userCurrentPage.value - 1) * userPageSize.value
+  return filteredUsersList.value.slice(start, start + userPageSize.value)
+})
+
+watch(userTotalPages, (newTotal) => {
+  if (userCurrentPage.value > newTotal) {
+    userCurrentPage.value = Math.max(1, newTotal)
+  }
+})
+
+watch(userSearchQuery, () => {
+  userCurrentPage.value = 1
 })
 
 // -----------------------------------------------------------------------------
@@ -550,7 +951,10 @@ const restoreTarget = ref(null)
 const restoreTargetType = ref('')
 
 const restoreDialogTitle = computed(() => {
-  if (restoreTargetType.value === 'DEVICE') return 'Pulihkan Perangkat'
+  if (restoreTargetType.value === 'DEVICE') {
+    const isAudio = restoreTarget.value?.deviceType === 'AUDIO' || restoreTarget.value?.id?.startsWith('AUD-')
+    return isAudio ? 'Pulihkan Speaker Audio' : 'Pulihkan Kamera CCTV'
+  }
   if (restoreTargetType.value === 'SITE') return 'Pulihkan Site'
   if (restoreTargetType.value === 'ZONE') return 'Pulihkan Zona'
   if (restoreTargetType.value === 'USER') return 'Pulihkan Akun Pengguna'
@@ -561,7 +965,11 @@ const restoreDialogMessage = computed(() => {
   const t = restoreTarget.value
   if (!t) return ''
   if (restoreTargetType.value === 'DEVICE') {
-    return `Apakah Anda yakin ingin memulihkan perangkat ${t.id} (${t.name}) kembali ke inventaris aktif?`
+    const isAudio = t.deviceType === 'AUDIO' || t.id?.startsWith('AUD-')
+    if (isAudio) {
+      return `Apakah Anda yakin ingin memulihkan speaker audio ${t.id} (${t.name}) kembali ke inventaris aktif?`
+    }
+    return `Apakah Anda yakin ingin memulihkan kamera CCTV ${t.id} (${t.name}) kembali ke inventaris aktif?`
   }
   if (restoreTargetType.value === 'SITE') {
     return `Apakah Anda yakin ingin memulihkan Site ${t.id} (${t.name})?`
@@ -606,12 +1014,14 @@ async function executeRestore() {
 
   try {
     if (restoreTargetType.value === 'DEVICE') {
-      await trashStore.restoreDevice(target.deviceType, target.id)
+      const isAudio = target.deviceType === 'AUDIO' || target.id?.startsWith('AUD-')
+      await trashStore.restoreDevice(target.deviceType || (isAudio ? 'AUDIO' : 'CCTV'), target.id)
       await Promise.all([
         cctvStore.fetchCameras(),
         audioStore.fetchAudioDevices()
       ])
-      toast.success('Perangkat Dipulihkan', `${target.id} (${target.name}) berhasil dipulihkan dan aktif kembali.`)
+      const label = isAudio ? 'Speaker Audio' : 'Kamera CCTV'
+      toast.success(`${label} Dipulihkan`, `${target.id} (${target.name}) berhasil dipulihkan dan aktif kembali.`)
     } else if (restoreTargetType.value === 'SITE') {
       await trashStore.restoreSite(target.id)
       await cctvStore.fetchSitesAndZones()

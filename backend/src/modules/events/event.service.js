@@ -382,10 +382,17 @@ export async function getSystemRecap(params = {}) {
   const hasDateFilter = Boolean(params.startDate || params.endDate);
   const commandWhereDate = hasDateFilter ? { requestedAt: commandDateFilter } : {};
 
-  const [totalCameras, onlineCameras, offlineCameras, pttCount] = await Promise.all([
+  const [
+    totalCameras,
+    onlineCameras,
+    totalAudios,
+    onlineAudios,
+    pttCount,
+  ] = await Promise.all([
     prisma.camera.count({ where: { deletedAt: null } }),
     prisma.camera.count({ where: { deletedAt: null, status: "ONLINE" } }),
-    prisma.camera.count({ where: { deletedAt: null, status: "OFFLINE" } }),
+    prisma.audioDevice.count({ where: { deletedAt: null } }),
+    prisma.audioDevice.count({ where: { deletedAt: null, status: "ONLINE" } }),
     prisma.audioCommand.count({
       where: {
         AND: [{ kind: "PTT" }, commandWhereDate],
@@ -394,9 +401,14 @@ export async function getSystemRecap(params = {}) {
   ]);
 
   const onlinePercent =
-    totalCameras > 0 ? Number(((onlineCameras / totalCameras) * 100).toFixed(1)) : 100.0;
+    totalCameras > 0 ? Number(((onlineCameras / totalCameras) * 100).toFixed(1)) : 0.0;
   const offlinePercent =
     totalCameras > 0 ? Number((100 - onlinePercent).toFixed(1)) : 0.0;
+
+  const audioOnlinePercent =
+    totalAudios > 0 ? Number(((onlineAudios / totalAudios) * 100).toFixed(1)) : 0.0;
+  const audioOfflinePercent =
+    totalAudios > 0 ? Number((100 - audioOnlinePercent).toFixed(1)) : 0.0;
 
   return {
     cctv: {
@@ -404,6 +416,8 @@ export async function getSystemRecap(params = {}) {
       offlinePercent,
     },
     audio: {
+      onlinePercent: audioOnlinePercent,
+      offlinePercent: audioOfflinePercent,
       totalPtt: pttCount,
       totalSessions: pttCount,
     },

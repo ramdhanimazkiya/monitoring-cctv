@@ -2,19 +2,19 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { useToast } from '../composables/useToast.js'
 
-import DashboardLayout from '../layouts/DashboardLayout.vue'
-import LoginView from '../views/LoginView.vue'
-import DashboardView from '../views/DashboardView.vue'
-import CctvView from '../views/CctvView.vue'
-import AudioPagingView from '../views/AudioPagingView.vue'
-import AudioSchedulerView from '../views/AudioSchedulerView.vue'
-import EventsView from '../views/EventsView.vue'
-import DevicesView from '../views/DevicesView.vue'
-import SitesZonesView from '../views/SitesZonesView.vue'
-import UsersView from '../views/UsersView.vue'
-import SettingsView from '../views/SettingsView.vue'
-import AuditLogsView from '../views/AuditLogsView.vue'
-import SoftDeleteView from '../views/SoftDeleteView.vue'
+const DashboardLayout = () => import('../layouts/DashboardLayout.vue')
+const LoginView = () => import('../views/LoginView.vue')
+const DashboardView = () => import('../views/DashboardView.vue')
+const CctvView = () => import('../views/CctvView.vue')
+const AudioPagingView = () => import('../views/AudioPagingView.vue')
+const AudioSchedulerView = () => import('../views/AudioSchedulerView.vue')
+const EventsView = () => import('../views/EventsView.vue')
+const DevicesView = () => import('../views/DevicesView.vue')
+const SitesZonesView = () => import('../views/SitesZonesView.vue')
+const UsersView = () => import('../views/UsersView.vue')
+const SettingsView = () => import('../views/SettingsView.vue')
+const AuditLogsView = () => import('../views/AuditLogsView.vue')
+const SoftDeleteView = () => import('../views/SoftDeleteView.vue')
 
 const routes = [
   {

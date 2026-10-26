@@ -22,7 +22,7 @@ export const createUserSchema = z.object({
     .or(z.literal("")),
   password: z
     .string()
-    .min(6, "Password minimal 6 karakter")
+    .min(8, "Password minimal 8 karakter")
     .max(100, "Password maksimal 100 karakter"),
   role: z.enum(["ADMIN", "OPERATOR"]).default("OPERATOR"),
   isActive: z.boolean().default(true),
@@ -45,7 +45,7 @@ export const updateUserSchema = z.object({
     .or(z.literal("")),
   password: z
     .string()
-    .min(6, "Password minimal 6 karakter")
+    .min(8, "Password minimal 8 karakter")
     .max(100, "Password maksimal 100 karakter")
     .optional()
     .nullable()

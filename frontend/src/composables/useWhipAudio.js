@@ -13,16 +13,12 @@ export function useWhipAudio() {
   const isPttLocked = ref(false) // Hands-free toggle mode
   const publishState = ref('idle') // 'idle' | 'requesting_mic' | 'connecting' | 'live' | 'error'
   const publishError = ref('')
-  const audioLevel = ref(0) // 0 - 100 for VU meter
   const durationSeconds = ref(0)
   const targetUrls = ref([])
   const activeSessionsCount = ref(0)
 
   let pttSessions = [] // Array of { url, pc, resourceUrl }
   let pttMediaStream = null
-  let pttAudioContext = null
-  let pttAnalyser = null
-  let pttAnimFrameId = null
   let pttTimerInterval = null
 
   // Check WebRTC support
@@ -81,62 +77,6 @@ export function useWhipAudio() {
     return modified
   }
 
-  /**
-   * Setup AudioContext Analyser for live VU meter (using 16kHz sample rate)
-   */
-  function startAudioMeter(stream) {
-    try {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext
-      if (!AudioContextClass) return
-
-      try {
-        pttAudioContext = new AudioContextClass({ sampleRate: 16000 })
-      } catch (_) {
-        pttAudioContext = new AudioContextClass()
-      }
-
-      const source = pttAudioContext.createMediaStreamSource(stream)
-      pttAnalyser = pttAudioContext.createAnalyser()
-      pttAnalyser.fftSize = 256
-      source.connect(pttAnalyser)
-
-      const dataArray = new Uint8Array(pttAnalyser.frequencyBinCount)
-
-      const updateLevel = () => {
-        if (!isPublishing.value || !pttAnalyser) {
-          audioLevel.value = 0
-          return
-        }
-
-        pttAnalyser.getByteFrequencyData(dataArray)
-        let sum = 0
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i]
-        }
-        const avg = sum / dataArray.length
-        // Normalize 0..100 with sensitivity multiplier
-        audioLevel.value = Math.min(100, Math.round((avg / 128) * 100))
-        pttAnimFrameId = requestAnimationFrame(updateLevel)
-      }
-
-      updateLevel()
-    } catch (err) {
-      console.warn('AudioContext meter init error:', err)
-    }
-  }
-
-  function stopAudioMeter() {
-    if (pttAnimFrameId) {
-      cancelAnimationFrame(pttAnimFrameId)
-      pttAnimFrameId = null
-    }
-    if (pttAudioContext && pttAudioContext.state !== 'closed') {
-      pttAudioContext.close().catch(() => {})
-      pttAudioContext = null
-    }
-    pttAnalyser = null
-    audioLevel.value = 0
-  }
 
   /**
    * Helper to establish a single WHIP WebRTC connection using transceiver & cloned track
@@ -286,7 +226,6 @@ export function useWhipAudio() {
       })
 
       publishState.value = 'connecting'
-      startAudioMeter(pttMediaStream)
 
       // 2. Connect in parallel to all unique target WHIP endpoints using addTransceiver
       const connectionPromises = uniqueUrls.map(url => connectSingleWhipSession(url, pttMediaStream))
@@ -362,7 +301,6 @@ export function useWhipAudio() {
       pttTimerInterval = null
     }
 
-    stopAudioMeter()
 
     // Stop mic hardware tracks
     if (pttMediaStream) {
@@ -411,7 +349,6 @@ export function useWhipAudio() {
     isPttLocked,
     publishState,
     publishError,
-    audioLevel,
     durationSeconds,
     startPublish,
     stopPublish

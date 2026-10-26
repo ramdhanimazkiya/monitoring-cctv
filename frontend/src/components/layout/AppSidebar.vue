@@ -143,10 +143,7 @@
                       : 'text-slate-400 hover:bg-[#151f33] hover:text-slate-100'
                   ]"
                 >
-                  <div class="flex items-center gap-2 truncate">
-                    <component :is="sub.icon" class="w-3.5 h-3.5 shrink-0 opacity-80" />
-                    <span class="truncate">{{ sub.label }}</span>
-                  </div>
+                  <span class="truncate">{{ sub.label }}</span>
                   <span
                     v-if="sub.badge && sub.badge() > 0"
                     class="ml-auto text-[9px] font-mono px-1 rounded bg-[#101726] text-amber-400 border border-amber-800/60"
@@ -197,8 +194,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { useTrashStore } from '../../stores/trash.js'
 import {
@@ -224,24 +221,31 @@ const props = defineProps({
   }
 })
 
-defineEmits(['toggle-collapse'])
+const emit = defineEmits(['toggle-collapse'])
 
 const route = useRoute()
-const router = useRouter()
 const authStore = useAuthStore()
 const trashStore = useTrashStore()
 
-const softDeleteExpanded = ref(true)
+const softDeleteExpanded = ref(route.path.startsWith('/soft-delete'))
 const isSoftDeleteActive = computed(() => route.path.startsWith('/soft-delete'))
+
+// Sinkronkan state dropdown terbuka jika rute berpindah ke soft-delete
+watch(
+  () => route.path,
+  (newPath) => {
+    if (newPath.startsWith('/soft-delete')) {
+      softDeleteExpanded.value = true
+    }
+  }
+)
 
 function toggleSoftDeleteExpand() {
   if (props.collapsed) {
-    router.push('/soft-delete/devices')
+    emit('toggle-collapse')
+    softDeleteExpanded.value = true
   } else {
     softDeleteExpanded.value = !softDeleteExpanded.value
-    if (!isSoftDeleteActive.value) {
-      router.push('/soft-delete/devices')
-    }
   }
 }
 
@@ -270,19 +274,16 @@ const adminNav = [
       {
         label: 'Device Management',
         path: '/soft-delete/devices',
-        icon: Server,
         badge: () => trashStore.summary.devicesCount
       },
       {
         label: 'Site & Zone',
         path: '/soft-delete/sites-zones',
-        icon: MapPin,
         badge: () => trashStore.summary.sitesZonesCount
       },
       {
         label: 'User Management',
         path: '/soft-delete/users',
-        icon: Users,
         badge: () => trashStore.summary.usersCount
       }
     ]
