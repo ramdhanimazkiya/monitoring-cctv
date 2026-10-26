@@ -10,9 +10,6 @@
           <h2 class="text-lg font-bold text-slate-100 tracking-tight">
             Data Terhapus: {{ pageTitle }}
           </h2>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/70 text-amber-300 border border-amber-800">
-            ADMIN
-          </span>
         </div>
         <p class="text-xs text-slate-400 mt-1 font-mono">
           {{ pageDescription }}
