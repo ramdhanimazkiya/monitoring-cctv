@@ -111,7 +111,7 @@ export async function getSiteById(id) {
 }
 
 export async function createSite(data, userId, req) {
-  // Generate ID dengan format SIT-001 (3 digit+)
+  // Generate ID dengan format SIT-0001 (4 digit+) sesuai CHECK constraint DB
   let siteId = data.id;
   if (!siteId) {
     const existing = await prisma.site.findMany({ select: { id: true } });
@@ -120,7 +120,7 @@ export async function createSite(data, userId, req) {
       return m ? parseInt(m[0], 10) : 0;
     });
     const maxNum = nums.length > 0 ? Math.max(...nums) : 0;
-    siteId = `SIT-${String(maxNum + 1).padStart(3, "0")}`;
+    siteId = `SIT-${String(maxNum + 1).padStart(4, "0")}`;
   }
 
   const created = await prisma.site.create({
@@ -231,7 +231,7 @@ export async function createZone(data, userId, req) {
     if (!defaultSite) {
       defaultSite = await prisma.site.create({
         data: {
-          id: "SIT-001",
+          id: "SIT-0001",
           name: "Site Utama",
           description: "Site otomatis sistem",
         },
@@ -248,7 +248,7 @@ export async function createZone(data, userId, req) {
     throw new ConflictError(`Zona bernama '${data.name}' sudah ada di site ${siteId}`);
   }
 
-  // Generate ID dengan format ZON-001 (3 digit+) seperti SIT-001
+  // Generate ID dengan format ZON-0001 (4 digit+) sesuai CHECK constraint DB
   let zoneId = data.id;
   if (!zoneId) {
     const existingZones = await prisma.zone.findMany({ select: { id: true } });
@@ -257,7 +257,7 @@ export async function createZone(data, userId, req) {
       return m ? parseInt(m[0], 10) : 0;
     });
     const maxNum = nums.length > 0 ? Math.max(...nums) : 0;
-    zoneId = `ZON-${String(maxNum + 1).padStart(3, "0")}`;
+    zoneId = `ZON-${String(maxNum + 1).padStart(4, "0")}`;
   }
 
   const created = await prisma.zone.create({
