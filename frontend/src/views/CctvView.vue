@@ -204,8 +204,8 @@
               : 'border-[#1f2c40] hover:border-blue-500/50'
           ]"
         >
-          <!-- Top Overlay Header (z-40 agar selalu berada di atas layar hitam video) -->
-          <div class="absolute top-0 inset-x-0 bg-gradient-to-b from-black/95 via-black/70 to-transparent p-2.5 flex items-center justify-between z-40 text-xs pointer-events-auto">
+          <!-- Top Overlay Header (z-20 agar berada di atas layar video) -->
+          <div class="absolute top-0 inset-x-0 bg-gradient-to-b from-black/95 via-black/70 to-transparent p-2.5 flex items-center justify-between z-20 text-xs pointer-events-auto">
             <div class="flex items-center gap-2 min-w-0 font-mono">
               <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-950/90 text-blue-300 border border-blue-500/60 shrink-0 shadow-sm">
                 {{ cam.id }}
@@ -298,8 +298,8 @@
             </div>
           </div>
 
-          <!-- Bottom Overlay Footer (z-40 agar selalu berada di atas layar video) -->
-          <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-2 flex items-center justify-between text-[10px] font-mono text-slate-400 z-40 pointer-events-auto">
+          <!-- Bottom Overlay Footer (z-20 agar berada di atas layar video) -->
+          <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-2 flex items-center justify-between text-[10px] font-mono text-slate-400 z-20 pointer-events-auto">
             <div class="flex items-center gap-2 truncate">
               <span class="text-slate-300 font-medium truncate">{{ cam.zoneName || 'Lobby Utama' }}</span>
               <span class="text-slate-600">•</span>

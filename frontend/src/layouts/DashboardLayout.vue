@@ -10,18 +10,20 @@
       />
 
       <!-- Mobile Sidebar Overlay & Drawer -->
-      <div
-        v-if="mobileSidebarOpen"
-        class="fixed inset-0 z-40 bg-black/80 lg:hidden backdrop-blur-xs"
-        @click="mobileSidebarOpen = false"
-      >
-        <div class="w-64 h-full" @click.stop>
-          <AppSidebar
-            :collapsed="false"
-            @toggle-collapse="mobileSidebarOpen = false"
-          />
+      <Teleport to="body">
+        <div
+          v-if="mobileSidebarOpen"
+          class="fixed inset-0 z-50 bg-black/80 lg:hidden backdrop-blur-xs flex"
+          @click="mobileSidebarOpen = false"
+        >
+          <div class="w-64 max-w-[85vw] h-full shadow-2xl relative z-50" @click.stop>
+            <AppSidebar
+              :collapsed="false"
+              @toggle-collapse="mobileSidebarOpen = false"
+            />
+          </div>
         </div>
-      </div>
+      </Teleport>
 
       <!-- Main Content Area -->
       <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">

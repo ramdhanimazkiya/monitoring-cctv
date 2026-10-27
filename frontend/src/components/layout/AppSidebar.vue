@@ -5,8 +5,13 @@
       collapsed ? 'w-16' : 'w-64'
     ]"
   >
-    <!-- Brand / System Title -->
-    <div class="h-14 border-b border-[#283548] flex items-center px-4 justify-between bg-[#0b0f17]/60">
+    <!-- Brand / System Title & Header Toggle Button -->
+    <div
+      :class="[
+        'h-14 border-b border-[#283548] flex items-center bg-[#0b0f17]/60 transition-colors',
+        collapsed ? 'justify-center px-2' : 'justify-between px-3.5'
+      ]"
+    >
       <div v-if="!collapsed" class="flex items-center gap-2.5 min-w-0">
         <div class="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0">
           <Radio class="w-4 h-4 animate-pulse" />
@@ -21,20 +26,21 @@
           </span>
         </div>
       </div>
-      <div v-else class="mx-auto">
-        <div class="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
-          <Radio class="w-4 h-4" />
-        </div>
-      </div>
 
+      <!-- Tombol Toggle Sidebar (Selalu di Posisi Atas) -->
       <button
-        v-if="!collapsed"
         type="button"
-        class="text-slate-400 hover:text-white p-1 rounded-md hover:bg-slate-800 transition-colors"
-        title="Perkecil Sidebar"
+        :class="[
+          'rounded-lg transition-all cursor-pointer flex items-center justify-center',
+          collapsed
+            ? 'w-9 h-9 bg-[#151f33] hover:bg-blue-600/25 border border-[#283548] hover:border-blue-500/50 text-slate-300 hover:text-blue-400 shadow-xs'
+            : 'p-1.5 text-slate-400 hover:text-white hover:bg-slate-800'
+        ]"
+        :title="collapsed ? 'Perluas Sidebar' : 'Perkecil Sidebar'"
         @click="$emit('toggle-collapse')"
       >
-        <ChevronLeft class="w-4 h-4" />
+        <ChevronRight v-if="collapsed" class="w-4 h-4" />
+        <ChevronLeft v-else class="w-4 h-4" />
       </button>
     </div>
 
@@ -158,21 +164,11 @@
       </div>
     </div>
 
-    <!-- Sidebar Bottom: Collapse button if collapsed & Demo Role Indicator -->
-    <div class="p-2 border-t border-[#283548] bg-[#0b0f17]/40 space-y-2">
-      <button
-        v-if="collapsed"
-        type="button"
-        class="w-full flex items-center justify-center p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-        title="Perluas Sidebar"
-        @click="$emit('toggle-collapse')"
-      >
-        <ChevronRight class="w-4 h-4" />
-      </button>
-
+    <!-- Sidebar Bottom: User Profile Indicator -->
+    <div class="p-2 border-t border-[#283548] bg-[#0b0f17]/40 flex justify-center">
       <div
         v-if="!collapsed"
-        class="p-2 rounded-md bg-[#131b2c] border border-[#283548] text-[11px] text-slate-400"
+        class="w-full p-2 rounded-md bg-[#131b2c] border border-[#283548] text-[11px] text-slate-400"
       >
         <div class="flex items-center justify-between mb-1">
           <span class="font-mono text-slate-500 text-[10px]">AKTIF SEBAGAI:</span>
@@ -188,6 +184,16 @@
         <p class="truncate font-medium text-slate-200">
           {{ authStore.user?.fullName }}
         </p>
+      </div>
+
+      <!-- Collapsed Compact User Role Initial -->
+      <div
+        v-else
+        class="w-8 h-8 rounded-lg flex items-center justify-center font-mono text-[10px] font-bold"
+        :class="authStore.isAdmin ? 'bg-amber-950/70 border border-amber-800/80 text-amber-300' : 'bg-blue-950/70 border border-blue-800/80 text-blue-300'"
+        :title="`${authStore.user?.fullName} (${authStore.user?.role})`"
+      >
+        {{ (authStore.user?.fullName || authStore.user?.username || 'U').charAt(0).toUpperCase() }}
       </div>
     </div>
   </aside>
