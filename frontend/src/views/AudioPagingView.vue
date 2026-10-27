@@ -283,12 +283,11 @@
                       </div>
                     </div>
 
-                    <!-- Right: Latency & Volume -->
-                    <div class="flex items-center gap-2 text-[10px] font-mono text-slate-400 shrink-0 self-end sm:self-center">
-                      <span v-if="speaker.latencyMs" class="text-emerald-400">
+                    <!-- Right: Latency -->
+                    <div v-if="speaker.latencyMs" class="flex items-center gap-2 text-[10px] font-mono text-slate-400 shrink-0 self-end sm:self-center">
+                      <span class="text-emerald-400">
                         {{ speaker.latencyMs }}ms
                       </span>
-                      <span>Vol: {{ speaker.volume || 80 }}%</span>
                     </div>
                   </div>
                 </div>

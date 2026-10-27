@@ -103,7 +103,7 @@
       </template>
 
       <template #coordinates="{ row }">
-        <span v-if="row.latitude && row.longitude" class="font-mono text-[11px] text-cyan-300">
+        <span v-if="row.latitude !== null && row.longitude !== null && row.latitude !== undefined && row.longitude !== undefined" class="font-mono text-[11px] text-cyan-300">
           {{ Number(row.latitude).toFixed(4) }}, {{ Number(row.longitude).toFixed(4) }}
         </span>
         <span v-else class="text-[10px] text-slate-600 font-mono">
@@ -283,7 +283,7 @@
       </template>
 
       <template #coordinates="{ row }">
-        <span v-if="row.latitude && row.longitude" class="font-mono text-[11px] text-cyan-300">
+        <span v-if="row.latitude !== null && row.longitude !== null && row.latitude !== undefined && row.longitude !== undefined" class="font-mono text-[11px] text-cyan-300">
           {{ Number(row.latitude).toFixed(4) }}, {{ Number(row.longitude).toFixed(4) }}
         </span>
         <span v-else class="text-[10px] text-slate-600 font-mono">
@@ -510,15 +510,17 @@
             <div>
               <label class="text-[10px] font-mono text-slate-400 block mb-1">Latitude:</label>
               <input
-                v-model.number="activeCctv.latitude"
-                type="number"
-                step="0.000001"
+                v-model="activeCctv.latitude"
+                type="text"
+                inputmode="decimal"
                 placeholder="Contoh: -6.917464"
                 :class="[
                   'w-full bg-[#0a0e17] border rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
                   cctvErrors.latitude ? 'border-rose-500 focus:ring-rose-500' : 'border-[#283548] focus:ring-blue-500'
                 ]"
-                @input="cctvErrors.latitude = ''"
+                @keydown="onCoordinateKeydown"
+                @input="handleCoordinateInput($event, activeCctv, 'latitude', cctvErrors)"
+                @paste="handleCoordinatePaste($event, activeCctv, 'latitude', cctvErrors)"
               />
               <span v-if="cctvErrors.latitude" class="text-[10px] text-rose-400 font-mono mt-1 block">
                 ⚠ {{ cctvErrors.latitude }}
@@ -527,15 +529,17 @@
             <div>
               <label class="text-[10px] font-mono text-slate-400 block mb-1">Longitude:</label>
               <input
-                v-model.number="activeCctv.longitude"
-                type="number"
-                step="0.000001"
+                v-model="activeCctv.longitude"
+                type="text"
+                inputmode="decimal"
                 placeholder="Contoh: 107.619122"
                 :class="[
                   'w-full bg-[#0a0e17] border rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
                   cctvErrors.longitude ? 'border-rose-500 focus:ring-rose-500' : 'border-[#283548] focus:ring-blue-500'
                 ]"
-                @input="cctvErrors.longitude = ''"
+                @keydown="onCoordinateKeydown"
+                @input="handleCoordinateInput($event, activeCctv, 'longitude', cctvErrors)"
+                @paste="handleCoordinatePaste($event, activeCctv, 'longitude', cctvErrors)"
               />
               <span v-if="cctvErrors.longitude" class="text-[10px] text-rose-400 font-mono mt-1 block">
                 ⚠ {{ cctvErrors.longitude }}
@@ -601,7 +605,7 @@
             <input
               v-model="activeSpeaker.whipUrl"
               type="text"
-              placeholder="https://stream.example.com/audio-raw/whip"
+              placeholder="https://broadcast.example.com/audio_raw_{n}/whip"
               :class="[
                 'flex-1 bg-[#111827] border rounded-md px-3 py-2 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
                 speakerErrors.whipUrl || audioUrlDuplicateWarning ? 'border-rose-500 focus:ring-rose-500 text-rose-200' : 'border-[#283548] focus:ring-blue-500'
@@ -659,15 +663,17 @@
             <div>
               <label class="text-[10px] font-mono text-slate-400 block mb-1">Latitude:</label>
               <input
-                v-model.number="activeSpeaker.latitude"
-                type="number"
-                step="0.000001"
+                v-model="activeSpeaker.latitude"
+                type="text"
+                inputmode="decimal"
                 placeholder="Contoh: -6.917464"
                 :class="[
                   'w-full bg-[#0a0e17] border rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
                   speakerErrors.latitude ? 'border-rose-500 focus:ring-rose-500' : 'border-[#283548] focus:ring-blue-500'
                 ]"
-                @input="speakerErrors.latitude = ''"
+                @keydown="onCoordinateKeydown"
+                @input="handleCoordinateInput($event, activeSpeaker, 'latitude', speakerErrors)"
+                @paste="handleCoordinatePaste($event, activeSpeaker, 'latitude', speakerErrors)"
               />
               <span v-if="speakerErrors.latitude" class="text-[10px] text-rose-400 font-mono mt-1 block">
                 ⚠ {{ speakerErrors.latitude }}
@@ -676,35 +682,23 @@
             <div>
               <label class="text-[10px] font-mono text-slate-400 block mb-1">Longitude:</label>
               <input
-                v-model.number="activeSpeaker.longitude"
-                type="number"
-                step="0.000001"
+                v-model="activeSpeaker.longitude"
+                type="text"
+                inputmode="decimal"
                 placeholder="Contoh: 107.619122"
                 :class="[
                   'w-full bg-[#0a0e17] border rounded px-3 py-1.5 text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors',
                   speakerErrors.longitude ? 'border-rose-500 focus:ring-rose-500' : 'border-[#283548] focus:ring-blue-500'
                 ]"
-                @input="speakerErrors.longitude = ''"
+                @keydown="onCoordinateKeydown"
+                @input="handleCoordinateInput($event, activeSpeaker, 'longitude', speakerErrors)"
+                @paste="handleCoordinatePaste($event, activeSpeaker, 'longitude', speakerErrors)"
               />
               <span v-if="speakerErrors.longitude" class="text-[10px] text-rose-400 font-mono mt-1 block">
                 ⚠ {{ speakerErrors.longitude }}
               </span>
             </div>
           </div>
-        </div>
-
-        <div>
-          <div class="flex items-center justify-between text-xs font-medium text-slate-300 mb-1">
-            <label>Tingkat Volume Speaker:</label>
-            <span class="font-mono text-blue-400">{{ activeSpeaker.volume }}%</span>
-          </div>
-          <input
-            v-model="activeSpeaker.volume"
-            type="range"
-            min="0"
-            max="100"
-            class="w-full accent-blue-600 bg-[#151d2e] rounded-lg cursor-pointer"
-          />
         </div>
       </div>
 
@@ -911,11 +905,10 @@ const activeSpeaker = reactive({
   siteId: '',
   zoneId: '',
   whipUrl: '',
-  latitude: null,
-  longitude: null,
+  latitude: '',
+  longitude: '',
   sampleRate: 16000,
-  channels: 1,
-  volume: 80
+  channels: 1
 })
 
 const activeCctv = reactive({
@@ -924,8 +917,8 @@ const activeCctv = reactive({
   siteId: '',
   zoneId: '',
   streamUrl: '',
-  latitude: null,
-  longitude: null,
+  latitude: '',
+  longitude: '',
   description: ''
 })
 
@@ -959,6 +952,96 @@ function resetSpeakerErrors() {
   speakerErrors.whipUrl = ''
   speakerErrors.latitude = ''
   speakerErrors.longitude = ''
+}
+
+// Sanitasi & validasi ketat input koordinat GPS (hanya membolehkan angka, tanda minus di awal, dan satu titik desimal)
+function sanitizeCoordinate(value) {
+  if (value === null || value === undefined) return ''
+  const str = String(value).trim()
+  if (!str) return ''
+
+  const isNegative = str.startsWith('-')
+  let cleaned = str.replace(/[^0-9.]/g, '')
+
+  const dotIndex = cleaned.indexOf('.')
+  if (dotIndex !== -1) {
+    const beforeDot = cleaned.substring(0, dotIndex)
+    const afterDot = cleaned.substring(dotIndex + 1).replace(/\./g, '')
+    cleaned = beforeDot + '.' + afterDot
+  }
+
+  return (isNegative ? '-' : '') + cleaned
+}
+
+function onCoordinateKeydown(event) {
+  const allowedControlKeys = [
+    'Backspace',
+    'Delete',
+    'Tab',
+    'Escape',
+    'Enter',
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowUp',
+    'ArrowDown',
+    'Home',
+    'End'
+  ]
+  if (allowedControlKeys.includes(event.key)) return
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+
+  // Hanya angka 0-9 yang diizinkan
+  if (/^[0-9]$/.test(event.key)) return
+
+  const input = event.target
+  const val = input.value || ''
+  const start = input.selectionStart ?? 0
+  const end = input.selectionEnd ?? 0
+  const selectedText = val.substring(start, end)
+
+  // Tanda minus '-' hanya diizinkan di posisi paling awal (indeks 0) dan hanya boleh satu
+  if (event.key === '-') {
+    if (start === 0 && (!val.includes('-') || selectedText.includes('-'))) {
+      return
+    }
+  }
+
+  // Tanda titik '.' desimal hanya diizinkan satu kali
+  if (event.key === '.') {
+    if (!val.includes('.') || selectedText.includes('.')) {
+      return
+    }
+  }
+
+  // Tolak semua tombol alfabet (termasuk huruf 'e', 'E') dan simbol lainnya
+  event.preventDefault()
+}
+
+function handleCoordinateInput(event, targetObj, key, errorsObj) {
+  const cleanValue = sanitizeCoordinate(event.target.value)
+  targetObj[key] = cleanValue
+  if (event.target.value !== cleanValue) {
+    event.target.value = cleanValue
+  }
+  if (errorsObj && errorsObj[key]) {
+    errorsObj[key] = ''
+  }
+}
+
+function handleCoordinatePaste(event, targetObj, key, errorsObj) {
+  event.preventDefault()
+  const pastedText = (event.clipboardData || window.clipboardData)?.getData('text') || ''
+  const input = event.target
+  const val = input.value || ''
+  const start = input.selectionStart ?? 0
+  const end = input.selectionEnd ?? val.length
+  const newCombined = val.substring(0, start) + pastedText + val.substring(end)
+  const cleanValue = sanitizeCoordinate(newCombined)
+  targetObj[key] = cleanValue
+  input.value = cleanValue
+  if (errorsObj && errorsObj[key]) {
+    errorsObj[key] = ''
+  }
 }
 
 const siteOptions = computed(() => {
@@ -1033,9 +1116,8 @@ function openCreateModal(type) {
     activeSpeaker.siteId = cctvStore.sites[0]?.id || ''
     activeSpeaker.zoneId = cctvStore.zones[0]?.id || ''
     activeSpeaker.whipUrl = ''
-    activeSpeaker.latitude = null
-    activeSpeaker.longitude = null
-    activeSpeaker.volume = 80
+    activeSpeaker.latitude = ''
+    activeSpeaker.longitude = ''
     speakerModalOpen.value = true
   } else {
     resetCctvErrors()
@@ -1044,8 +1126,8 @@ function openCreateModal(type) {
     activeCctv.siteId = cctvStore.sites[0]?.id || ''
     activeCctv.zoneId = cctvStore.zones[0]?.id || ''
     activeCctv.streamUrl = ''
-    activeCctv.latitude = null
-    activeCctv.longitude = null
+    activeCctv.latitude = ''
+    activeCctv.longitude = ''
     activeCctv.description = ''
     cctvModalOpen.value = true
   }
@@ -1059,8 +1141,8 @@ function handleEditCctv(row) {
   activeCctv.siteId = row.siteId || ''
   activeCctv.zoneId = (row.zoneId && isZoneActive(row.zoneId)) ? row.zoneId : ''
   activeCctv.streamUrl = row.streamUrl || ''
-  activeCctv.latitude = row.latitude ? Number(row.latitude) : null
-  activeCctv.longitude = row.longitude ? Number(row.longitude) : null
+  activeCctv.latitude = row.latitude !== null && row.latitude !== undefined ? String(row.latitude) : ''
+  activeCctv.longitude = row.longitude !== null && row.longitude !== undefined ? String(row.longitude) : ''
   activeCctv.description = row.description || ''
   cctvModalOpen.value = true
 }
@@ -1125,17 +1207,28 @@ async function saveCctv() {
     }
   }
 
-  if (activeCctv.latitude !== null && activeCctv.latitude !== '') {
+  const hasLat = activeCctv.latitude !== null && activeCctv.latitude !== '' && activeCctv.latitude !== undefined
+  const hasLng = activeCctv.longitude !== null && activeCctv.longitude !== '' && activeCctv.longitude !== undefined
+
+  if (hasLat && !hasLng) {
+    cctvErrors.longitude = 'Longitude wajib diisi jika Latitude diisi.'
+    hasError = true
+  } else if (!hasLat && hasLng) {
+    cctvErrors.latitude = 'Latitude wajib diisi jika Longitude diisi.'
+    hasError = true
+  }
+
+  if (hasLat) {
     const lat = Number(activeCctv.latitude)
-    if (isNaN(lat) || lat < -90 || lat > 90) {
+    if (isNaN(lat) || lat < -90 || lat > 90 || activeCctv.latitude === '-' || activeCctv.latitude === '.') {
       cctvErrors.latitude = 'Latitude harus berupa angka antara -90 dan 90.'
       hasError = true
     }
   }
 
-  if (activeCctv.longitude !== null && activeCctv.longitude !== '') {
+  if (hasLng) {
     const lng = Number(activeCctv.longitude)
-    if (isNaN(lng) || lng < -180 || lng > 180) {
+    if (isNaN(lng) || lng < -180 || lng > 180 || activeCctv.longitude === '-' || activeCctv.longitude === '.') {
       cctvErrors.longitude = 'Longitude harus berupa angka antara -180 dan 180.'
       hasError = true
     }
@@ -1153,8 +1246,8 @@ async function saveCctv() {
     siteId: siteId,
     zoneId: activeCctv.zoneId || null,
     streamUrl: activeCctv.streamUrl?.trim() || null,
-    latitude: activeCctv.latitude !== null && activeCctv.latitude !== '' ? Number(activeCctv.latitude) : null,
-    longitude: activeCctv.longitude !== null && activeCctv.longitude !== '' ? Number(activeCctv.longitude) : null,
+    latitude: hasLat && !isNaN(Number(activeCctv.latitude)) ? Number(activeCctv.latitude) : null,
+    longitude: hasLng && !isNaN(Number(activeCctv.longitude)) ? Number(activeCctv.longitude) : null,
     description: activeCctv.description?.trim() || null
   }
 
@@ -1189,9 +1282,8 @@ function handleEditSpeaker(row) {
   activeSpeaker.siteId = row.siteId || ''
   activeSpeaker.zoneId = (row.zoneId && isZoneActive(row.zoneId)) ? row.zoneId : ''
   activeSpeaker.whipUrl = row.whipUrl || ''
-  activeSpeaker.latitude = row.latitude ? Number(row.latitude) : null
-  activeSpeaker.longitude = row.longitude ? Number(row.longitude) : null
-  activeSpeaker.volume = row.volume || 80
+  activeSpeaker.latitude = row.latitude !== null && row.latitude !== undefined ? String(row.latitude) : ''
+  activeSpeaker.longitude = row.longitude !== null && row.longitude !== undefined ? String(row.longitude) : ''
   speakerModalOpen.value = true
 }
 
@@ -1262,17 +1354,28 @@ async function saveSpeaker() {
     }
   }
 
-  if (activeSpeaker.latitude !== null && activeSpeaker.latitude !== '') {
+  const hasSpeakerLat = activeSpeaker.latitude !== null && activeSpeaker.latitude !== '' && activeSpeaker.latitude !== undefined
+  const hasSpeakerLng = activeSpeaker.longitude !== null && activeSpeaker.longitude !== '' && activeSpeaker.longitude !== undefined
+
+  if (hasSpeakerLat && !hasSpeakerLng) {
+    speakerErrors.longitude = 'Longitude wajib diisi jika Latitude diisi.'
+    hasError = true
+  } else if (!hasSpeakerLat && hasSpeakerLng) {
+    speakerErrors.latitude = 'Latitude wajib diisi jika Longitude diisi.'
+    hasError = true
+  }
+
+  if (hasSpeakerLat) {
     const lat = Number(activeSpeaker.latitude)
-    if (isNaN(lat) || lat < -90 || lat > 90) {
+    if (isNaN(lat) || lat < -90 || lat > 90 || activeSpeaker.latitude === '-' || activeSpeaker.latitude === '.') {
       speakerErrors.latitude = 'Latitude harus berupa angka antara -90 dan 90.'
       hasError = true
     }
   }
 
-  if (activeSpeaker.longitude !== null && activeSpeaker.longitude !== '') {
+  if (hasSpeakerLng) {
     const lng = Number(activeSpeaker.longitude)
-    if (isNaN(lng) || lng < -180 || lng > 180) {
+    if (isNaN(lng) || lng < -180 || lng > 180 || activeSpeaker.longitude === '-' || activeSpeaker.longitude === '.') {
       speakerErrors.longitude = 'Longitude harus berupa angka antara -180 dan 180.'
       hasError = true
     }
@@ -1294,9 +1397,8 @@ async function saveSpeaker() {
         zoneId: activeSpeaker.zoneId || null,
         zoneName: zoneName,
         whipUrl: activeSpeaker.whipUrl.trim(),
-        latitude: activeSpeaker.latitude !== null && activeSpeaker.latitude !== '' ? Number(activeSpeaker.latitude) : null,
-        longitude: activeSpeaker.longitude !== null && activeSpeaker.longitude !== '' ? Number(activeSpeaker.longitude) : null,
-        volume: activeSpeaker.volume
+        latitude: hasSpeakerLat && !isNaN(Number(activeSpeaker.latitude)) ? Number(activeSpeaker.latitude) : null,
+        longitude: hasSpeakerLng && !isNaN(Number(activeSpeaker.longitude)) ? Number(activeSpeaker.longitude) : null
       })
       speakerModalOpen.value = false
       toast.success('Speaker Didaftarkan', `ID otomatis ${created.id} (16kHz Mono) berhasil dibuat!`)
@@ -1307,9 +1409,8 @@ async function saveSpeaker() {
         zoneId: activeSpeaker.zoneId || null,
         zoneName: zoneName,
         whipUrl: activeSpeaker.whipUrl.trim(),
-        latitude: activeSpeaker.latitude !== null && activeSpeaker.latitude !== '' ? Number(activeSpeaker.latitude) : null,
-        longitude: activeSpeaker.longitude !== null && activeSpeaker.longitude !== '' ? Number(activeSpeaker.longitude) : null,
-        volume: activeSpeaker.volume
+        latitude: hasSpeakerLat && !isNaN(Number(activeSpeaker.latitude)) ? Number(activeSpeaker.latitude) : null,
+        longitude: hasSpeakerLng && !isNaN(Number(activeSpeaker.longitude)) ? Number(activeSpeaker.longitude) : null
       })
       speakerModalOpen.value = false
       toast.success('Speaker Diperbarui', `Data ${activeSpeaker.id} berhasil diperbarui.`)

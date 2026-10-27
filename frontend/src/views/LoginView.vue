@@ -8,9 +8,6 @@
     <div class="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
       <!-- Enterprise Brand Header -->
       <div class="text-center mb-6">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl border border-blue-500/50 bg-blue-950/40 text-blue-400 shadow-lg shadow-blue-500/20 mb-3 transition-transform hover:scale-105 duration-300">
-          <ShieldCheck class="w-7 h-7" />
-        </div>
 
         <h1 class="text-xl font-bold tracking-wider text-slate-100 font-mono uppercase">
           CCTV & AUDIO PAGING
@@ -63,6 +60,7 @@
           <Input
             v-model="form.username"
             label="Nama Pengguna (Username)"
+            placeholder="Masukkan username"
             required
             :error="errors.username"
             autocomplete="username"
@@ -76,6 +74,7 @@
             v-model="form.password"
             type="password"
             label="Kata Sandi (Password)"
+            placeholder="Masukkan kata sandi"
             required
             :error="errors.password"
             autocomplete="current-password"
@@ -110,18 +109,8 @@
         <!-- Compliance & Security Assurance Badge -->
         <div class="mt-5 pt-3.5 border-t border-[#1e2a3b] flex items-center justify-between text-[10px] font-mono text-slate-500">
           <!-- <span>Keamanan Sesi: TLS 1.3</span> -->
-          <span class="text-slate-400">Audit Logging Terpasang</span>
+          <!-- <span class="text-slate-400">Audit Logging Terpasang</span> -->
         </div>
-      </div>
-
-      <!-- Legal & Security Disclaimer -->
-      <div class="text-center mt-6 space-y-1">
-        <p class="text-[11px] text-slate-500 font-mono">
-          PERINGATAN SISTEM: Akses dibatasi untuk personel terdaftar.
-        </p>
-        <p class="text-[10px] text-slate-600 font-mono">
-          Semua aktivitas otentikasi dan operasi tercatat secara permanen dalam Audit Trail.
-        </p>
       </div>
     </div>
 
@@ -135,7 +124,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 import { useToast } from '../composables/useToast.js'
 import { Input, Button, ToastContainer } from '../components/ui/index.js'
-import { ShieldCheck, User, Lock, AlertCircle } from '@lucide/vue'
+import { User, Lock, AlertCircle } from '@lucide/vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
