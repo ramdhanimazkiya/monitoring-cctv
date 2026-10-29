@@ -18,8 +18,8 @@ const schema = z.object({
     .min(16, "SESSION_SECRET minimal 16 karakter")
     .default("cctv_monitoring_dev_secret_key_32bytes_change_in_prod"),
   SESSION_COOKIE_NAME: z.string().default("cctv_session"),
-  SESSION_TTL_HOURS: z.coerce.number().positive().default(8),
-  SESSION_IDLE_TIMEOUT_MINUTES: z.coerce.number().positive().default(30),
+  SESSION_TTL_HOURS: z.coerce.number().positive().default(87600),
+  SESSION_IDLE_TIMEOUT_MINUTES: z.coerce.number().nonnegative().default(0),
   CREDENTIAL_ENCRYPTION_KEY: z
     .string()
     .optional()

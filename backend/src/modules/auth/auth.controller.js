@@ -38,6 +38,7 @@ export async function login(req, res, next) {
       sameSite: "lax",
       path: "/",
       expires: expiresAt,
+      maxAge: Math.max(0, expiresAt.getTime() - Date.now()),
     });
 
     res.status(200).json({

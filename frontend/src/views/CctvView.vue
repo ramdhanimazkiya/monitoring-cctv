@@ -116,7 +116,7 @@
     <!-- SECTION 1: LEAFLET MAPS CONTAINER (Muncul pada mode 'map')            -->
     <!-- ===================================================================== -->
     <div
-      v-show="activeViewMode === 'map'"
+      v-if="activeViewMode === 'map'"
       class="bg-[#111827] border border-[#283548] rounded-xl p-3.5 space-y-3 shadow-xl transition-all"
     >
       <!-- Map Header & Map Action Tools -->
@@ -528,8 +528,8 @@ onMounted(async () => {
     cctvStore.fetchCameras(),
     cctvStore.fetchSitesAndZones()
   ])
-  // Polling status kamera setiap 1 detik via MediaMTX API (deteksi cepat tanpa jeda)
-  cctvStore.startCameraStatusPolling(1000)
+  // Polling status kamera setiap 5 detik via MediaMTX API
+  cctvStore.startCameraStatusPolling(5000)
 })
 
 onUnmounted(() => {

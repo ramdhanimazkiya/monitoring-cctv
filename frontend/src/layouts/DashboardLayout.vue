@@ -20,6 +20,7 @@
             <AppSidebar
               :collapsed="false"
               @toggle-collapse="mobileSidebarOpen = false"
+              @navigate="mobileSidebarOpen = false"
             />
           </div>
         </div>

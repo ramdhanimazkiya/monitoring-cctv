@@ -1457,8 +1457,8 @@ onMounted(async () => {
     audioStore.fetchAudioDevices(),
     cctvStore.fetchSitesAndZones()
   ])
-  // Polling status kamera 1 detik via MediaMTX API
-  cctvStore.startCameraStatusPolling(1000)
+  // Polling status kamera 5 detik via MediaMTX API
+  cctvStore.startCameraStatusPolling(5000)
   // Auto-ping pertama kali setelah data termuat untuk audio
   runAutoPing()
   // Jalankan auto-ping audio periodik

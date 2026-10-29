@@ -66,6 +66,7 @@
                 : 'text-slate-300 hover:bg-[#151f33] hover:text-white'
             ]"
             :title="collapsed ? item.label : ''"
+            @click="handleNavClick"
           >
             <component :is="item.icon" class="w-4 h-4 shrink-0 transition-transform group-hover:scale-105" />
             <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
@@ -101,6 +102,7 @@
                   : 'text-slate-300 hover:bg-[#151f33] hover:text-white'
               ]"
               :title="collapsed ? item.label : ''"
+              @click="handleNavClick"
             >
               <component :is="item.icon" class="w-4 h-4 shrink-0 transition-transform group-hover:scale-105" />
               <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
@@ -148,6 +150,7 @@
                       ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40'
                       : 'text-slate-400 hover:bg-[#151f33] hover:text-slate-100'
                   ]"
+                  @click="handleNavClick"
                 >
                   <span class="truncate">{{ sub.label }}</span>
                   <span
@@ -227,7 +230,11 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['toggle-collapse'])
+const emit = defineEmits(['toggle-collapse', 'navigate'])
+
+function handleNavClick() {
+  emit('navigate')
+}
 
 const route = useRoute()
 const authStore = useAuthStore()

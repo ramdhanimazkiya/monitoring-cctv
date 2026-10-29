@@ -214,16 +214,18 @@ export async function getSessionByToken(rawToken) {
       return null;
     }
 
-    // Cek idle timeout (inactivity)
-    const idleLimitMs = env.SESSION_IDLE_TIMEOUT_MINUTES * 60 * 1000;
-    const timeSinceLastSeen = now.getTime() - new Date(session.lastSeenAt).getTime();
-    if (timeSinceLastSeen > idleLimitMs) {
-      // Cabut sesi karena idle
-      await prisma.session.update({
-        where: { id: session.id },
-        data: { revokedAt: now },
-      });
-      return null;
+    // Cek idle timeout (inactivity) jika diaktifkan (> 0)
+    if (env.SESSION_IDLE_TIMEOUT_MINUTES > 0) {
+      const idleLimitMs = env.SESSION_IDLE_TIMEOUT_MINUTES * 60 * 1000;
+      const timeSinceLastSeen = now.getTime() - new Date(session.lastSeenAt).getTime();
+      if (timeSinceLastSeen > idleLimitMs) {
+        // Cabut sesi karena idle
+        await prisma.session.update({
+          where: { id: session.id },
+          data: { revokedAt: now },
+        });
+        return null;
+      }
     }
 
     // Perbarui last_seen_at dengan throttling (maksimum 1x per 60 detik)
